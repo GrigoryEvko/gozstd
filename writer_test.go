@@ -496,3 +496,54 @@ func TestWriterBig(t *testing.T) {
 		t.Fatalf("unequal writtenBB and readBB\nwrittenBB=\n%X\nreadBB=\n%X", writtenBB.Bytes(), readBB.Bytes())
 	}
 }
+
+func TestWriterMultiThreading(t *testing.T) {
+	// Test data - make it large enough to benefit from multi-threading
+	data := make([]byte, 10*1024*1024) // 10MB
+	for i := range data {
+		data[i] = byte(i % 256)
+	}
+
+	// Test different numbers of workers
+	workerCounts := []int{0, 1, 2, 4, 8}
+
+	for _, nbWorkers := range workerCounts {
+		t.Run(fmt.Sprintf("NbWorkers=%d", nbWorkers), func(t *testing.T) {
+			params := &WriterParams{
+				CompressionLevel: 3,
+				NbWorkers:        nbWorkers,
+			}
+
+			var bb bytes.Buffer
+			zw := NewWriterParams(&bb, params)
+			
+			// Write the data
+			n, err := zw.Write(data)
+			if err != nil {
+				t.Fatalf("cannot write data with nbWorkers=%d: %s", nbWorkers, err)
+			}
+			if n != len(data) {
+				t.Fatalf("unexpected bytes written: got %d, want %d", n, len(data))
+			}
+
+			// Close the writer
+			if err := zw.Close(); err != nil {
+				t.Fatalf("cannot close writer with nbWorkers=%d: %s", nbWorkers, err)
+			}
+			zw.Release()
+
+			// Decompress and verify
+			decompressed, err := Decompress(nil, bb.Bytes())
+			if err != nil {
+				t.Fatalf("cannot decompress data with nbWorkers=%d: %s", nbWorkers, err)
+			}
+
+			if !bytes.Equal(decompressed, data) {
+				t.Fatalf("decompressed data mismatch with nbWorkers=%d", nbWorkers)
+			}
+
+			t.Logf("nbWorkers=%d: compressed %d bytes to %d bytes (%.2f%% ratio)",
+				nbWorkers, len(data), bb.Len(), float64(bb.Len())/float64(len(data))*100)
+		})
+	}
+}

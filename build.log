@@ -1,0 +1,39 @@
+Using container runtime: nerdctl
+rm -f libzstd_linux_amd64.a
+cd zstd/lib && ZSTD_LEGACY_SUPPORT=0 MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 -flto=1 -fwhole-program " LDFLAGS="-flto=1 -fuse-linker-plugin" make clean libzstd.a
+make[1]: Entering directory '/var/home/grigory/containerd/gozstd/zstd/lib'
+Cleaning library completed
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/debug.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/entropy_common.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/error_private.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/fse_decompress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/pool.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/xxhash.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/threading.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_common.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/fse_compress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/hist.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/huf_compress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_compress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_compress_literals.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_compress_sequences.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_compress_superblock.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_double_fast.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_fast.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_lazy.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_ldm.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_opt.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_preSplit.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstdmt_compress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/huf_decompress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_ddict.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_decompress.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zstd_decompress_block.o
+AS obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/huf_decompress_amd64.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/cover.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/divsufsort.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/fastcover.o
+CC obj/conf_4ac72047274d3e00ad8a036de02efe2b/static/zdict.o
+compiling single-threaded static library 1.5.7
+make[1]: Leaving directory '/var/home/grigory/containerd/gozstd/zstd/lib'
+mv zstd/lib/libzstd.a libzstd_linux_amd64.a

@@ -64,6 +64,7 @@ type Writer struct {
 	w                io.Writer
 	compressionLevel int
 	wlog             int
+	nbWorkers        int
 	cs               *C.ZSTD_CStream
 	cd               *CDict
 
@@ -143,6 +144,12 @@ type WriterParams struct {
 
 	// Dict is optional dictionary used for compression.
 	Dict *CDict
+
+	// NbWorkers controls the number of compression threads.
+	// 0 = single-threaded mode (default)
+	// >=1 = multi-threaded mode with specified number of workers
+	// Note: The library must be compiled with ZSTD_MULTITHREAD=1 for this to work.
+	NbWorkers int
 }
 
 // NewWriterParams returns new zstd writer writing compressed data to w
@@ -174,6 +181,7 @@ func NewWriterParams(w io.Writer, params *WriterParams) *Writer {
 		w:                w,
 		compressionLevel: params.CompressionLevel,
 		wlog:             params.WindowLog,
+		nbWorkers:        params.NbWorkers,
 		cs:               cs,
 		cd:               params.Dict,
 		inBuf:            inBuf,
@@ -194,6 +202,7 @@ func (zw *Writer) Reset(w io.Writer, cd *CDict, compressionLevel int) {
 	params := WriterParams{
 		CompressionLevel: compressionLevel,
 		WindowLog:        zw.wlog,
+		NbWorkers:        zw.nbWorkers,
 		Dict:             cd,
 	}
 	zw.ResetWriterParams(w, &params)
@@ -206,6 +215,9 @@ func (zw *Writer) ResetWriterParams(w io.Writer, params *WriterParams) {
 	zw.outBuf.size = cstreamOutBufSize
 	zw.outBuf.pos = 0
 
+	zw.compressionLevel = params.CompressionLevel
+	zw.wlog = params.WindowLog
+	zw.nbWorkers = params.NbWorkers
 	zw.cd = params.Dict
 	initCStream(zw.cs, *params)
 
@@ -229,6 +241,13 @@ func initCStream(cs *C.ZSTD_CStream, params WriterParams) {
 		C.uintptr_t(uintptr(unsafe.Pointer(cs))),
 		C.ZSTD_cParameter(C.ZSTD_c_windowLog),
 		C.int(params.WindowLog))
+	ensureNoError("ZSTD_CCtx_setParameter", result)
+
+	// Set number of workers for multi-threaded compression
+	result = C.ZSTD_CCtx_setParameter_wrapper(
+		C.uintptr_t(uintptr(unsafe.Pointer(cs))),
+		C.ZSTD_cParameter(400), // ZSTD_c_nbWorkers
+		C.int(params.NbWorkers))
 	ensureNoError("ZSTD_CCtx_setParameter", result)
 }
 
