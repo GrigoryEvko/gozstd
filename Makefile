@@ -68,7 +68,7 @@ endif
 			if echo "$(TARGET)" | grep -q "macos\|darwin"; then \
 				LTO_FLAG=""; \
 			else \
-				LTO_FLAG="-flto -flto-jobs=1"; \
+				LTO_FLAG="-flto"; \
 			fi; \
 			ZSTD_LEGACY_SUPPORT=0 AR="zig ar" \
 			CC="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
