@@ -135,6 +135,14 @@ func (cctx *CCtx) Reset(reset ZSTD_ResetDirective) error {
 
 // SetParameter sets compression parameters for the given context
 func (cctx *CCtx) SetParameter(param CParameter, value int) error {
+	// Validate boolean parameters
+	switch param {
+	case ZSTD_c_checksumFlag, ZSTD_c_contentSizeFlag, ZSTD_c_dictIDFlag:
+		if value != 0 && value != 1 {
+			return fmt.Errorf("invalid value %d for boolean parameter %v: must be 0 or 1", value, param)
+		}
+	}
+	
 	result := C.ZSTD_CCtx_setParameter(cctx.cctx,
 		C.ZSTD_cParameter(param), C.int(value))
 	isErr := C.ZSTD_isError(C.size_t(result))

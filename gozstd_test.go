@@ -401,3 +401,421 @@ func TestCompress2(t *testing.T) {
 			plainData, origData, len(plainData), len(origData))
 	}
 }
+
+func TestAdvancedAPIAllParameters(t *testing.T) {
+	testData := []byte("This is test data for advanced compression API testing. " +
+		"We need some repetitive data to test compression effectively. " +
+		"Repetitive data repetitive data repetitive data repetitive data.")
+
+	tests := []struct {
+		name       string
+		parameters map[CParameter]int
+	}{
+		{
+			name: "compression_levels",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 5,
+			},
+		},
+		{
+			name: "window_log",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_windowLog:        15,
+			},
+		},
+		{
+			name: "hash_log",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_hashLog:          20,
+			},
+		},
+		{
+			name: "chain_log",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_chainLog:         20,
+			},
+		},
+		{
+			name: "search_log",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_searchLog:        5,
+			},
+		},
+		{
+			name: "min_match",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_minMatch:         4,
+			},
+		},
+		{
+			name: "target_length",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_targetLength:     64,
+			},
+		},
+		{
+			name: "checksum_enabled",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_checksumFlag:     1,
+			},
+		},
+		{
+			name: "checksum_disabled",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_checksumFlag:     0,
+			},
+		},
+		{
+			name: "content_size_flag",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_contentSizeFlag:  1,
+			},
+		},
+		{
+			name: "dict_id_flag",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 3,
+				ZSTD_c_dictIDFlag:       1,
+			},
+		},
+		{
+			name: "ldm_enabled",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel:           3,
+				ZSTD_c_enableLongDistanceMatching: 1,
+				ZSTD_c_ldmHashLog:                 20,
+				ZSTD_c_ldmMinMatch:                64,
+			},
+		},
+		{
+			name: "multi_params",
+			parameters: map[CParameter]int{
+				ZSTD_c_compressionLevel: 5,
+				ZSTD_c_windowLog:        20,
+				ZSTD_c_hashLog:          18,
+				ZSTD_c_checksumFlag:     1,
+				ZSTD_c_contentSizeFlag:  1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			// Apply all parameters
+			for param, value := range tt.parameters {
+				err := ctx.SetParameter(param, value)
+				if err != nil {
+					t.Fatalf("cannot set parameter %v to %v: %s", param, value, err)
+				}
+			}
+
+			// Compress
+			compressed, err := ctx.Compress(nil, testData)
+			if err != nil {
+				t.Fatalf("compression failed: %s", err)
+			}
+
+			// Decompress
+			decompressed, err := Decompress(nil, compressed)
+			if err != nil {
+				t.Fatalf("decompression failed: %s", err)
+			}
+
+			// Verify
+			if !bytes.Equal(decompressed, testData) {
+				t.Fatalf("data mismatch: got %q, want %q", decompressed, testData)
+			}
+		})
+	}
+}
+
+func TestAdvancedAPIStrategies(t *testing.T) {
+	testData := []byte(strings.Repeat("Test data for compression strategies. ", 100))
+
+	strategies := []struct {
+		name     string
+		strategy ZSTD_CompressionStrategy
+	}{
+		{"fast", ZSTD_fast},
+		{"dfast", ZSTD_dfast},
+		{"greedy", ZSTD_greedy},
+		{"lazy", ZSTD_lazy},
+		{"lazy2", ZSTD_lazy2},
+		{"btlazy2", ZSTD_btlazy2},
+		{"btopt", ZSTD_btopt},
+		{"btultra", ZSTD_btultra},
+		{"btultra2", ZSTD_btultra2},
+	}
+
+	for _, s := range strategies {
+		t.Run(s.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			err := ctx.SetParameter(ZSTD_c_compressionLevel, 3)
+			if err != nil {
+				t.Fatalf("cannot set compression level: %s", err)
+			}
+			
+			err = ctx.SetParameter(ZSTD_c_strategy, int(s.strategy))
+			if err != nil {
+				t.Fatalf("cannot set strategy %s: %s", s.name, err)
+			}
+
+			compressed, err := ctx.Compress(nil, testData)
+			if err != nil {
+				t.Fatalf("compression with strategy %s failed: %s", s.name, err)
+			}
+
+			decompressed, err := Decompress(nil, compressed)
+			if err != nil {
+				t.Fatalf("decompression failed: %s", err)
+			}
+
+			if !bytes.Equal(decompressed, testData) {
+				t.Fatalf("data mismatch with strategy %s", s.name)
+			}
+		})
+	}
+}
+
+func TestAdvancedAPIReset(t *testing.T) {
+	testData := []byte("Test data for reset functionality")
+
+	resetDirectives := []struct {
+		name      string
+		directive ZSTD_ResetDirective
+	}{
+		{"session_only", ZSTD_reset_session_only},
+		{"parameters", ZSTD_reset_parameters},
+		{"session_and_parameters", ZSTD_reset_session_and_parameters},
+	}
+
+	for _, rd := range resetDirectives {
+		t.Run(rd.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			// Set some parameters
+			ctx.SetParameter(ZSTD_c_compressionLevel, 5)
+			ctx.SetParameter(ZSTD_c_checksumFlag, 1)
+			
+			// Compress once
+			compressed1, err := ctx.Compress(nil, testData)
+			if err != nil {
+				t.Fatalf("first compression failed: %s", err)
+			}
+
+			// Reset
+			err = ctx.Reset(rd.directive)
+			if err != nil {
+				t.Fatalf("reset with %s failed: %s", rd.name, err)
+			}
+
+			// Compress again
+			compressed2, err := ctx.Compress(nil, testData)
+			if err != nil {
+				t.Fatalf("second compression failed: %s", err)
+			}
+
+			// Both should decompress correctly
+			decompressed1, err := Decompress(nil, compressed1)
+			if err != nil {
+				t.Fatalf("first decompression failed: %s", err)
+			}
+			
+			decompressed2, err := Decompress(nil, compressed2)
+			if err != nil {
+				t.Fatalf("second decompression failed: %s", err)
+			}
+
+			if !bytes.Equal(decompressed1, testData) || !bytes.Equal(decompressed2, testData) {
+				t.Fatalf("data mismatch after reset")
+			}
+		})
+	}
+}
+
+func TestAdvancedAPIPledgedSrcSize(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         []byte
+		pledgedSize  uint64
+		expectError  bool
+	}{
+		{
+			name:        "exact_size",
+			data:        []byte("Hello, World!"),
+			pledgedSize: 13,
+			expectError: false,
+		},
+		{
+			name:        "zero_size",
+			data:        []byte{},
+			pledgedSize: 0,
+			expectError: false,
+		},
+		{
+			name:        "large_data",
+			data:        bytes.Repeat([]byte("Large data "), 1000),
+			pledgedSize: 11000,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			err := ctx.SetPledgedSrcSize(tt.pledgedSize)
+			if err != nil {
+				t.Fatalf("cannot set pledged size: %s", err)
+			}
+
+			compressed, err := ctx.Compress(nil, tt.data)
+			if (err != nil) != tt.expectError {
+				t.Fatalf("compression error mismatch: got %v, expectError %v", err, tt.expectError)
+			}
+
+			if !tt.expectError {
+				decompressed, err := Decompress(nil, compressed)
+				if err != nil {
+					t.Fatalf("decompression failed: %s", err)
+				}
+
+				if !bytes.Equal(decompressed, tt.data) {
+					t.Fatalf("data mismatch")
+				}
+			}
+		})
+	}
+}
+
+func TestAdvancedAPIMultiThreading(t *testing.T) {
+	// Note: Multi-threading parameters require ZSTD_MULTITHREAD=1 during compilation
+	// These tests verify the API works but may not actually use multiple threads
+	// if the library wasn't compiled with multi-threading support
+	
+	largeData := bytes.Repeat([]byte("Multi-threading test data. "), 10000)
+
+	tests := []struct {
+		name       string
+		nbWorkers  int
+		jobSize    int
+		overlapLog int
+	}{
+		{
+			name:      "single_worker",
+			nbWorkers: 1,
+		},
+		{
+			name:      "two_workers",
+			nbWorkers: 2,
+		},
+		{
+			name:      "four_workers_with_jobsize",
+			nbWorkers: 4,
+			jobSize:   1048576, // 1MB
+		},
+		{
+			name:       "workers_with_overlap",
+			nbWorkers:  2,
+			overlapLog: 6,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			// Set multi-threading parameters
+			err := ctx.SetParameter(ZSTD_c_nbWorkers, tt.nbWorkers)
+			if err != nil {
+				// Multi-threading might not be available
+				t.Skipf("cannot set nbWorkers: %s (multi-threading might not be compiled in)", err)
+			}
+
+			if tt.jobSize > 0 {
+				err = ctx.SetParameter(ZSTD_c_jobSize, tt.jobSize)
+				if err != nil {
+					t.Fatalf("cannot set jobSize: %s", err)
+				}
+			}
+
+			if tt.overlapLog > 0 {
+				err = ctx.SetParameter(ZSTD_c_overlapLog, tt.overlapLog)
+				if err != nil {
+					t.Fatalf("cannot set overlapLog: %s", err)
+				}
+			}
+
+			compressed, err := ctx.Compress(nil, largeData)
+			if err != nil {
+				t.Fatalf("compression failed: %s", err)
+			}
+
+			decompressed, err := Decompress(nil, compressed)
+			if err != nil {
+				t.Fatalf("decompression failed: %s", err)
+			}
+
+			if !bytes.Equal(decompressed, largeData) {
+				t.Fatalf("data mismatch")
+			}
+		})
+	}
+}
+
+func TestAdvancedAPIErrorCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		param       CParameter
+		value       int
+		expectError bool
+	}{
+		{
+			name:        "negative_compression_level",
+			param:       ZSTD_c_compressionLevel,
+			value:       -5,
+			expectError: false, // Negative levels are allowed
+		},
+		{
+			name:        "too_high_compression_level",
+			param:       ZSTD_c_compressionLevel,
+			value:       25,
+			expectError: false, // Will be clamped to max
+		},
+		{
+			name:        "invalid_strategy",
+			param:       ZSTD_c_strategy,
+			value:       999,
+			expectError: true,
+		},
+		{
+			name:        "invalid_checksum_flag",
+			param:       ZSTD_c_checksumFlag,
+			value:       2,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewCCtx()
+			
+			err := ctx.SetParameter(tt.param, tt.value)
+			if (err != nil) != tt.expectError {
+				t.Fatalf("error mismatch: got %v, expectError %v", err, tt.expectError)
+			}
+		})
+	}
+}
