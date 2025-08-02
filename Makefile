@@ -4,7 +4,7 @@ GOOS_GOARCH := $(GOOS)_$(GOARCH)
 GOOS_GOARCH_NATIVE := $(shell go env GOHOSTOS)_$(shell go env GOHOSTARCH)
 LIBZSTD_NAME := libzstd_$(GOOS_GOARCH).a
 ZSTD_VERSION ?= v1.5.7-kernel
-ZIG_BUILDER_IMAGE := euantorano/zig:0.10.1
+ZIG_BUILDER_IMAGE := gozstd-zig-builder:latest
 
 # Detect available container runtime
 CONTAINER_RUNTIME := $(shell \
@@ -25,7 +25,16 @@ $(info Using container runtime: $(CONTAINER_RUNTIME))
 JOBS := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 MAKEFLAGS += -j$(JOBS)
 
-.PHONY: libzstd.a $(LIBZSTD_NAME) test test-no-lto bench bench-no-lto
+.PHONY: libzstd.a $(LIBZSTD_NAME) test test-no-lto bench bench-no-lto build-zig-image
+
+# Build our custom Zig builder Docker image with latest Alpine and Zig
+build-zig-image:
+ifeq ($(CONTAINER_RUNTIME),none)
+	$(error No container runtime found. Please install docker, nerdctl, or podman)
+endif
+	@echo "Building custom Zig builder image with latest Alpine and Zig..."
+	$(CONTAINER_RUNTIME) build -f Dockerfile.zig-builder -t $(ZIG_BUILDER_IMAGE) .
+	@echo "Zig builder image built successfully: $(ZIG_BUILDER_IMAGE)"
 
 libzstd.a: $(LIBZSTD_NAME)
 $(LIBZSTD_NAME):
@@ -53,28 +62,29 @@ else ifeq ($(GOOS_GOARCH),windows_amd64)
 	TARGET=x86_64-windows GOARCH=amd64 GOOS=windows GOARCH=amd64 ARCH_FLAGS="-mcpu=x86_64+sse4_2+avx2+bmi2" $(MAKE) package-arch
 endif
 
-package-arch:
+package-arch: build-zig-image
 ifeq ($(CONTAINER_RUNTIME),none)
 	$(error No container runtime found. Please install docker, nerdctl, or podman for cross-compilation)
 endif
 	rm -f $(LIBZSTD_NAME)
 	$(CONTAINER_RUNTIME) run --rm \
-		--entrypoint /bin/sh \
+		--entrypoint /bin/bash \
 		--mount type=bind,src="$(shell pwd)",dst=/zstd \
 		-w /zstd/zstd/lib \
 		$(DOCKER_OPTS) \
 		$(ZIG_BUILDER_IMAGE) \
-		-c 'apk add --no-cache make && \
-			if echo "$(TARGET)" | grep -q "macos\|darwin"; then \
+		-c 'if echo "$(TARGET)" | grep -q "macos\|darwin"; then \
 				LTO_FLAG=""; \
 			else \
 				LTO_FLAG="-flto"; \
 			fi; \
+			rm -f ./*.o ./*.a ./*.gcda ./*.so ./*.so.* libzstd.pc ./-.o 2>/dev/null || true; \
+			rm -rf obj/* dll/*.dll dll/*.lib libzstd-nomt* *.dSYM 2>/dev/null || true; \
 			ZSTD_LEGACY_SUPPORT=0 AR="zig ar" \
 			CC="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
 			CXX="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
 			MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 $$LTO_FLAG $(ARCH_FLAGS) $(MOREFLAGS)" \
-			make -j$(shell nproc 2>/dev/null || echo 4) clean libzstd.a'
+			make -j$(JOBS) libzstd.a'
 	mv -f zstd/lib/libzstd.a $(LIBZSTD_NAME)
 
 # freebsd and illumos aren't supported by zig compiler atm.
