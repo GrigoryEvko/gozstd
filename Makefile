@@ -31,7 +31,7 @@ libzstd.a: $(LIBZSTD_NAME)
 $(LIBZSTD_NAME):
 ifeq ($(GOOS_GOARCH),$(GOOS_GOARCH_NATIVE))
 	rm -f $(LIBZSTD_NAME)
-	cd zstd/lib && ZSTD_LEGACY_SUPPORT=0 AR="gcc-ar" ARFLAGS="rcs" MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 -flto=1 $(MOREFLAGS)" LDFLAGS="-flto=1 -fuse-linker-plugin" $(MAKE) clean libzstd.a
+	cd zstd/lib && ZSTD_LEGACY_SUPPORT=0 AR="gcc-ar" ARFLAGS="rcs" MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 -flto=auto $(MOREFLAGS)" LDFLAGS="-flto=auto -fuse-linker-plugin" $(MAKE) clean libzstd.a
 	mv zstd/lib/libzstd.a $(LIBZSTD_NAME)
 else ifeq ($(GOOS_GOARCH),linux_amd64)
 	TARGET=x86_64-linux GOARCH=amd64 GOOS=linux ARCH_FLAGS="-mcpu=x86_64+sse4_2+avx2+bmi2" $(MAKE) package-arch
@@ -68,7 +68,7 @@ endif
 			if echo "$(TARGET)" | grep -q "macos\|darwin"; then \
 				LTO_FLAG=""; \
 			else \
-				LTO_FLAG="-flto"; \
+				LTO_FLAG="-flto=auto"; \
 			fi; \
 			ZSTD_LEGACY_SUPPORT=0 AR="zig ar" \
 			CC="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
