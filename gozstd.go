@@ -15,6 +15,10 @@ static size_t ZSTD_compressCCtx_wrapper(void *ctx, void *dst, size_t dstCapacity
     return ZSTD_compressCCtx((ZSTD_CCtx*)ctx, dst, dstCapacity, src, srcSize, compressionLevel);
 }
 
+static size_t ZSTD_compress2_wrapper(void *ctx, void *dst, size_t dstCapacity, const void *src, size_t srcSize) {
+    return ZSTD_compress2((ZSTD_CCtx*)ctx, dst, dstCapacity, src, srcSize);
+}
+
 static size_t ZSTD_compress_usingCDict_wrapper(void *ctx, void *dst, size_t dstCapacity, void *src, size_t srcSize, void *cdict) {
     return ZSTD_compress_usingCDict((ZSTD_CCtx*)ctx, (void*)dst, dstCapacity, (const void*)src, srcSize, (const ZSTD_CDict*)cdict);
 }
@@ -35,6 +39,7 @@ static unsigned long long ZSTD_findDecompressedSize_wrapper(void *src, size_t sr
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -109,6 +114,66 @@ type cctxWrapper struct {
 	cctx *C.ZSTD_CCtx
 }
 
+type CCtx cctxWrapper
+
+// NewCCtx creates a new compression context
+func NewCCtx() *CCtx {
+	ctx := (*CCtx)(cctxPool.Get().(*cctxWrapper))
+	ctx.SetParameter(ZSTD_c_compressionLevel, 0)
+	return ctx
+}
+
+func (cctx *CCtx) Reset(reset ZSTD_ResetDirective) error {
+	result := C.ZSTD_CCtx_reset(cctx.cctx,
+		C.ZSTD_ResetDirective(reset))
+	isErr := C.ZSTD_isError(C.size_t(result))
+	if isErr != 0 {
+		return errors.New("Error reseting context: " + errStr(result))
+	}
+	return nil
+}
+
+// SetParameter sets compression parameters for the given context
+func (cctx *CCtx) SetParameter(param CParameter, value int) error {
+	result := C.ZSTD_CCtx_setParameter(cctx.cctx,
+		C.ZSTD_cParameter(param), C.int(value))
+	isErr := C.ZSTD_isError(C.size_t(result))
+	if isErr != 0 {
+		return errors.New("Error setting parameter: " + errStr(result))
+	}
+	return nil
+}
+
+/*
+*  Total input data size to be compressed as a single frame.
+*  Value will be written in frame header, unless if explicitly forbidden using ZSTD_c_contentSizeFlag.
+*  This value will also be controlled at end of frame, and trigger an error if not respected.
+* @result : 0, or an error code (which can be tested with ZSTD_isError()).
+*  Note 1 : pledgedSrcSize==0 actually means zero, aka an empty frame.
+*           In order to mean "unknown content size", pass constant ZSTD_CONTENTSIZE_UNKNOWN.
+*           ZSTD_CONTENTSIZE_UNKNOWN is default value for any new frame.
+*  Note 2 : pledgedSrcSize is only valid once, for the next frame.
+*           It's discarded at the end of the frame, and replaced by ZSTD_CONTENTSIZE_UNKNOWN.
+*  Note 3 : Whenever all input data is provided and consumed in a single round,
+*           for example with ZSTD_compress2(),
+*           or invoking immediately ZSTD_compressStream2(,,,ZSTD_e_end),
+*           this value is automatically overridden by srcSize instead.
+ */
+func (cctx *CCtx) SetPledgedSrcSize(PledgedSrcSize uint64) error {
+	result := C.ZSTD_CCtx_setPledgedSrcSize(cctx.cctx,
+		C.ulonglong(PledgedSrcSize))
+	isErr := C.ZSTD_isError(C.size_t(result))
+	if isErr != 0 {
+		return errors.New("Error setting pledged size: " + errStr(result))
+	}
+	return nil
+}
+
+func (cctx *CCtx) Compress(dst, src []byte) ([]byte, error) {
+	ctxWrap := cctxWrapper{cctx.cctx}
+	return compress2(&ctxWrap, dst, src)
+}
+
 func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressionLevel int) []byte {
 	if len(src) == 0 {
 		return dst
@@ -146,6 +211,45 @@ func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressi
 	return dst
 }
 
+func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
+	if len(src) == 0 {
+		return dst, nil
+	}
+
+	dstLen := len(dst)
+	if cap(dst) > dstLen {
+		// Fast path - try compressing without dst resize.
+		result := compress2Internal(cctx, dst[dstLen:cap(dst)], src, false)
+		compressedSize := int(result)
+		if compressedSize >= 0 {
+			// All OK.
+			return dst[:dstLen+compressedSize], nil
+		}
+
+		if C.ZSTD_getErrorCode(result) != C.ZSTD_error_dstSize_tooSmall {
+			// Unexpected error.
+			return dst, errors.New("Unexpected error during compression" + errStr(result))
+		}
+	}
+
+	// Slow path - resize dst to fit compressed data.
+	compressBound := int(C.ZSTD_compressBound(C.size_t(len(src)))) + 1
+	if n := dstLen + compressBound - cap(dst) + dstLen; n > 0 {
+		// This should be optimized since go 1.11 - see https://golang.org/doc/go1.11#performance-compiler.
+		dst = append(dst[:cap(dst)], make([]byte, n)...)
+	}
+
+	result := compress2Internal(cctx, dst[dstLen:dstLen+compressBound], src, false)
+	compressedSize := int(result)
+	if int(result) >= 0 {
+		return dst[:dstLen+compressedSize], nil
+	}
+	if C.ZSTD_getErrorCode(result) != 0 {
+		return dst, fmt.Errorf("Unexpected error in ZSTD_compress2_wrapper: %s", errStr(result))
+	}
+	return dst[:dstLen+compressedSize], nil
+}
+
 func compressInternal(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressionLevel int, mustSucceed bool) C.size_t {
 	dstHdr := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
 	srcHdr := (*reflect.SliceHeader)(unsafe.Pointer(&src))
@@ -178,6 +282,25 @@ func compressInternal(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, c
 	runtime.KeepAlive(src)
 	if mustSucceed {
 		ensureNoError("ZSTD_compressCCtx", result)
+	}
+	return result
+}
+
+func compress2Internal(cctx *cctxWrapper, dst, src []byte, mustSucceed bool) C.size_t {
+	dstHdr := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
+	srcHdr := (*reflect.SliceHeader)(unsafe.Pointer(&src))
+	
+	result := C.ZSTD_compress2_wrapper(
+		unsafe.Pointer(cctx.cctx),
+		unsafe.Pointer(dstHdr.Data),
+		C.size_t(cap(dst)),
+		unsafe.Pointer(srcHdr.Data),
+		C.size_t(len(src)))
+	// Prevent from GC'ing of dst and src during CGO call above.
+	runtime.KeepAlive(dst)
+	runtime.KeepAlive(src)
+	if mustSucceed {
+		ensureNoError("ZSTD_compress2", result)
 	}
 	return result
 }
