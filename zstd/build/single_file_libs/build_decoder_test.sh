@@ -12,7 +12,7 @@ IN_FILES="examples/emscripten.c"
 # Emscripten build using emcc.
 emscripten_emcc_build() {
   # Compile the same example as above
-  CC_FLAGS="-Wall -Wextra -Wshadow -Werror -Os -g0 -flto"
+  CC_FLAGS="-Wall -Wextra -Wshadow -Werror -Os -g0 -flto=auto"
   emcc $CC_FLAGS -s WASM=1 -I. -o $OUT_WASM $IN_FILES
   # Did compilation work?
   if [ $? -ne 0 ]; then
