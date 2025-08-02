@@ -1,14 +1,14 @@
 package gozstd
 
 /*
-#cgo CFLAGS: -O3
+#cgo CFLAGS: -O3 -I${SRCDIR}/cgo/headers
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
 #include "zstd_errors.h"
 
 // The following *_wrapper functions allow avoiding memory allocations
-// durting calls from Go.
+// during calls from Go.
 // See https://github.com/golang/go/issues/24450 .
 
 static size_t ZSTD_compressCCtx_wrapper(void *ctx, void *dst, size_t dstCapacity, const void *src, size_t srcSize, int compressionLevel) {

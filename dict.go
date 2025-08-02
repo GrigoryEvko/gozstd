@@ -1,7 +1,7 @@
 package gozstd
 
 /*
-#cgo CFLAGS: -O3
+#cgo CFLAGS: -O3 -I${SRCDIR}/cgo/headers
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
@@ -15,12 +15,20 @@ package gozstd
 // durting calls from Go.
 // See https://github.com/golang/go/issues/24450 .
 
-static ZSTD_CDict* ZSTD_createCDict_wrapper(uintptr_t dictBuffer, size_t dictSize, int compressionLevel) {
+static ZSTD_CDict* ZSTD_createCDict_wrapper(void *dictBuffer, size_t dictSize, int compressionLevel) {
 	return ZSTD_createCDict((const void *)dictBuffer, dictSize, compressionLevel);
 }
 
-static ZSTD_DDict* ZSTD_createDDict_wrapper(uintptr_t dictBuffer, size_t dictSize) {
+static ZSTD_DDict* ZSTD_createDDict_wrapper(void *dictBuffer, size_t dictSize) {
 	return ZSTD_createDDict((const void *)dictBuffer, dictSize);
+}
+
+static ZSTD_CDict* ZSTD_createCDict_byReference_wrapper(void *dictBuffer, size_t dictSize, int compressionLevel) {
+	return ZSTD_createCDict_byReference((const void *)dictBuffer, dictSize, compressionLevel);
+}
+
+static ZSTD_DDict* ZSTD_createDDict_byReference_wrapper(void *dictBuffer, size_t dictSize) {
+	return ZSTD_createDDict_byReference((const void *)dictBuffer, dictSize);
 }
 
 */
@@ -125,7 +133,7 @@ func NewCDictLevel(dict []byte, compressionLevel int) (*CDict, error) {
 
 	cd := &CDict{
 		p: C.ZSTD_createCDict_wrapper(
-			C.uintptr_t(uintptr(unsafe.Pointer(&dict[0]))),
+			unsafe.Pointer(&dict[0]),
 			C.size_t(len(dict)),
 			C.int(compressionLevel)),
 		compressionLevel: compressionLevel,
@@ -169,7 +177,7 @@ func NewDDict(dict []byte) (*DDict, error) {
 
 	dd := &DDict{
 		p: C.ZSTD_createDDict_wrapper(
-			C.uintptr_t(uintptr(unsafe.Pointer(&dict[0]))),
+			unsafe.Pointer(&dict[0]),
 			C.size_t(len(dict))),
 	}
 	// Prevent from GC'ing of dict during CGO call above.
@@ -193,4 +201,69 @@ func (dd *DDict) Release() {
 
 func freeDDict(v interface{}) {
 	v.(*DDict).Release()
+}
+
+// NewCDictByRef creates new CDict from the given dict without copying the dict data.
+//
+// The dict data must remain valid throughout the lifetime of the returned CDict.
+//
+// This is more memory-efficient than NewCDict when the dict data is already
+// stored elsewhere and doesn't need to be copied.
+//
+// Call Release when the returned dict is no longer used.
+func NewCDictByRef(dict []byte) (*CDict, error) {
+	return NewCDictByRefLevel(dict, DefaultCompressionLevel)
+}
+
+// NewCDictByRefLevel creates new CDict from the given dict
+// using the given compressionLevel without copying the dict data.
+//
+// The dict data must remain valid throughout the lifetime of the returned CDict.
+//
+// This is more memory-efficient than NewCDictLevel when the dict data is already
+// stored elsewhere and doesn't need to be copied.
+//
+// Call Release when the returned dict is no longer used.
+func NewCDictByRefLevel(dict []byte, compressionLevel int) (*CDict, error) {
+	if len(dict) == 0 {
+		return nil, fmt.Errorf("dict cannot be empty")
+	}
+
+	cd := &CDict{
+		p: C.ZSTD_createCDict_byReference_wrapper(
+			unsafe.Pointer(&dict[0]),
+			C.size_t(len(dict)),
+			C.int(compressionLevel)),
+		compressionLevel: compressionLevel,
+	}
+	// Prevent from GC'ing of dict during CGO call above.
+	// IMPORTANT: The caller must ensure dict remains valid for the lifetime of the CDict
+	runtime.KeepAlive(dict)
+	runtime.SetFinalizer(cd, freeCDict)
+	return cd, nil
+}
+
+// NewDDictByRef creates new DDict from the given dict without copying the dict data.
+//
+// The dict data must remain valid throughout the lifetime of the returned DDict.
+//
+// This is more memory-efficient than NewDDict when the dict data is already
+// stored elsewhere and doesn't need to be copied.
+//
+// Call Release when the returned dict is no longer needed.
+func NewDDictByRef(dict []byte) (*DDict, error) {
+	if len(dict) == 0 {
+		return nil, fmt.Errorf("dict cannot be empty")
+	}
+
+	dd := &DDict{
+		p: C.ZSTD_createDDict_byReference_wrapper(
+			unsafe.Pointer(&dict[0]),
+			C.size_t(len(dict))),
+	}
+	// Prevent from GC'ing of dict during CGO call above.
+	// IMPORTANT: The caller must ensure dict remains valid for the lifetime of the DDict
+	runtime.KeepAlive(dict)
+	runtime.SetFinalizer(dd, freeDDict)
+	return dd, nil
 }

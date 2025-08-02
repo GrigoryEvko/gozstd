@@ -819,3 +819,134 @@ func TestAdvancedAPIErrorCases(t *testing.T) {
 		})
 	}
 }
+
+func TestDictByRef(t *testing.T) {
+	// Build a dictionary
+	var samples [][]byte
+	for i := 0; i < 1000; i++ {
+		sample := fmt.Sprintf("sample %d: this is a dictionary training sample line %d", i, i)
+		samples = append(samples, []byte(sample))
+	}
+	dict := BuildDict(samples, 16*1024)
+	if len(dict) == 0 {
+		t.Fatal("failed to build dictionary")
+	}
+
+	// Test compression dictionary by reference
+	t.Run("CDict", func(t *testing.T) {
+		cd, err := NewCDictByRef(dict)
+		if err != nil {
+			t.Fatalf("cannot create CDict by reference: %s", err)
+		}
+		defer cd.Release()
+
+		// Compress some data with the dictionary
+		testData := []byte("this is some test data that should benefit from the dictionary")
+		compressed := CompressDict(nil, testData, cd)
+
+		// Create a decompression dictionary
+		dd, err := NewDDictByRef(dict)
+		if err != nil {
+			t.Fatalf("cannot create DDict by reference: %s", err)
+		}
+		defer dd.Release()
+
+		// Decompress
+		decompressed, err := DecompressDict(nil, compressed, dd)
+		if err != nil {
+			t.Fatalf("decompression failed: %s", err)
+		}
+
+		if !bytes.Equal(decompressed, testData) {
+			t.Fatalf("data mismatch: got %q, want %q", decompressed, testData)
+		}
+	})
+
+	// Test with compression level
+	t.Run("CDictLevel", func(t *testing.T) {
+		for level := 1; level <= 5; level++ {
+			cd, err := NewCDictByRefLevel(dict, level)
+			if err != nil {
+				t.Fatalf("cannot create CDict by reference with level %d: %s", level, err)
+			}
+			defer cd.Release()
+
+			testData := []byte(fmt.Sprintf("test data for compression level %d", level))
+			compressed := CompressDict(nil, testData, cd)
+
+			dd, err := NewDDictByRef(dict)
+			if err != nil {
+				t.Fatalf("cannot create DDict by reference: %s", err)
+			}
+			defer dd.Release()
+
+			decompressed, err := DecompressDict(nil, compressed, dd)
+			if err != nil {
+				t.Fatalf("decompression failed for level %d: %s", level, err)
+			}
+
+			if !bytes.Equal(decompressed, testData) {
+				t.Fatalf("data mismatch for level %d", level)
+			}
+		}
+	})
+
+	// Test concurrent usage
+	t.Run("Concurrent", func(t *testing.T) {
+		cd, err := NewCDictByRef(dict)
+		if err != nil {
+			t.Fatalf("cannot create CDict by reference: %s", err)
+		}
+		defer cd.Release()
+
+		dd, err := NewDDictByRef(dict)
+		if err != nil {
+			t.Fatalf("cannot create DDict by reference: %s", err)
+		}
+		defer dd.Release()
+
+		// Run multiple goroutines using the same dictionaries
+		const numGoroutines = 10
+		ch := make(chan error, numGoroutines)
+
+		for i := 0; i < numGoroutines; i++ {
+			go func(id int) {
+				testData := []byte(fmt.Sprintf("goroutine %d test data", id))
+				for j := 0; j < 100; j++ {
+					compressed := CompressDict(nil, testData, cd)
+					decompressed, err := DecompressDict(nil, compressed, dd)
+					if err != nil {
+						ch <- fmt.Errorf("decompression error in goroutine %d: %s", id, err)
+						return
+					}
+					if !bytes.Equal(decompressed, testData) {
+						ch <- fmt.Errorf("data mismatch in goroutine %d", id)
+						return
+					}
+				}
+				ch <- nil
+			}(i)
+		}
+
+		// Wait for all goroutines
+		for i := 0; i < numGoroutines; i++ {
+			if err := <-ch; err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+
+	// Test error cases
+	t.Run("Errors", func(t *testing.T) {
+		// Empty dictionary
+		_, err := NewCDictByRef(nil)
+		if err == nil {
+			t.Fatal("expected error for nil dictionary")
+		}
+
+		_, err = NewDDictByRef([]byte{})
+		if err == nil {
+			t.Fatal("expected error for empty dictionary")
+		}
+	})
+}

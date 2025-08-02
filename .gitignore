@@ -1,1 +1,37 @@
+# Go test binary
+gozstd.test
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.DS_Store
 tags
+
+# Test artifacts
+test/testdata/fuzz/*/
+fuzz_results_*
+/testdata/
+
+# Build artifacts (but NOT the distributed libraries in cgo/lib/)
+# Only ignore .a files in the root directory (temporary build outputs)
+/*.a
+*.o
+*.so
+*.dll
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Go workspace
+go.work
+go.work.sum
+
+# Benchmark results
+*.bench
+*.prof
+
+# Container build artifacts
+.container-*
