@@ -65,6 +65,8 @@ type Writer struct {
 	compressionLevel int
 	wlog             int
 	nbWorkers        int
+	jobSize          int  // Track job size parameter
+	overlapLog       int  // Track overlap log parameter
 	cs               *C.ZSTD_CStream
 	cd               *CDict
 
@@ -150,6 +152,18 @@ type WriterParams struct {
 	// >=1 = multi-threaded mode with specified number of workers
 	// Note: The library must be compiled with ZSTD_MULTITHREAD=1 for this to work.
 	NbWorkers int
+
+	// JobSize controls the size of each compression job in multi-threaded mode.
+	// 0 = auto-selected based on compression level (default)
+	// Must be >= 1 KB and <= 512 MB when specified
+	// Larger job sizes reduce overhead but may increase memory usage
+	JobSize int
+
+	// OverlapLog controls the overlap size as a fraction of window size.
+	// 0 = auto-selected based on compression level (default)
+	// Valid range: 0 to 9 (where 9 means overlap size = windowSize)
+	// Higher values provide better compression ratio but increase memory usage
+	OverlapLog int
 }
 
 // NewWriterParams returns new zstd writer writing compressed data to w
@@ -182,6 +196,8 @@ func NewWriterParams(w io.Writer, params *WriterParams) *Writer {
 		compressionLevel: params.CompressionLevel,
 		wlog:             params.WindowLog,
 		nbWorkers:        params.NbWorkers,
+		jobSize:          params.JobSize,
+		overlapLog:       params.OverlapLog,
 		cs:               cs,
 		cd:               params.Dict,
 		inBuf:            inBuf,
@@ -203,6 +219,8 @@ func (zw *Writer) Reset(w io.Writer, cd *CDict, compressionLevel int) {
 		CompressionLevel: compressionLevel,
 		WindowLog:        zw.wlog,
 		NbWorkers:        zw.nbWorkers,
+		JobSize:          zw.jobSize,
+		OverlapLog:       zw.overlapLog,
 		Dict:             cd,
 	}
 	zw.ResetWriterParams(w, &params)
@@ -218,6 +236,8 @@ func (zw *Writer) ResetWriterParams(w io.Writer, params *WriterParams) {
 	zw.compressionLevel = params.CompressionLevel
 	zw.wlog = params.WindowLog
 	zw.nbWorkers = params.NbWorkers
+	zw.jobSize = params.JobSize
+	zw.overlapLog = params.OverlapLog
 	zw.cd = params.Dict
 	initCStream(zw.cs, *params)
 
@@ -249,6 +269,29 @@ func initCStream(cs *C.ZSTD_CStream, params WriterParams) {
 		C.ZSTD_cParameter(400), // ZSTD_c_nbWorkers
 		C.int(params.NbWorkers))
 	ensureNoError("ZSTD_CCtx_setParameter", result)
+
+	// Automatically use shared thread pool when multi-threading is enabled
+	if params.NbWorkers > 0 {
+		useThreadPool(cs)
+	}
+
+	// Set job size for multi-threaded compression (if specified)
+	if params.JobSize > 0 {
+		result = C.ZSTD_CCtx_setParameter_wrapper(
+			C.uintptr_t(uintptr(unsafe.Pointer(cs))),
+			C.ZSTD_cParameter(401), // ZSTD_c_jobSize
+			C.int(params.JobSize))
+		ensureNoError("ZSTD_CCtx_setParameter", result)
+	}
+
+	// Set overlap log for multi-threaded compression (if specified)
+	if params.OverlapLog > 0 {
+		result = C.ZSTD_CCtx_setParameter_wrapper(
+			C.uintptr_t(uintptr(unsafe.Pointer(cs))),
+			C.ZSTD_cParameter(402), // ZSTD_c_overlapLog
+			C.int(params.OverlapLog))
+		ensureNoError("ZSTD_CCtx_setParameter", result)
+	}
 }
 
 func freeCStream(v interface{}) {

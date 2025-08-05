@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -113,6 +114,9 @@ var buildDictLock sync.Mutex
 type CDict struct {
 	p                *C.ZSTD_CDict
 	compressionLevel int
+	refCount         int64  // atomic reference counter
+	released         int64  // atomic flag indicating if dictionary is released
+	generation       int64  // atomic generation counter to prevent ABA problem
 }
 
 // NewCDict creates new CDict from the given dict.
@@ -137,6 +141,9 @@ func NewCDictLevel(dict []byte, compressionLevel int) (*CDict, error) {
 			C.size_t(len(dict)),
 			C.int(compressionLevel)),
 		compressionLevel: compressionLevel,
+		refCount:         1, // Start with 1 reference
+		released:         0,
+		generation:       0, // Start with generation 0
 	}
 	// Prevent from GC'ing of dict during CGO call above.
 	runtime.KeepAlive(dict)
@@ -144,16 +151,73 @@ func NewCDictLevel(dict []byte, compressionLevel int) (*CDict, error) {
 	return cd, nil
 }
 
+// acquireRef safely acquires a reference to the dictionary.
+// Returns true if successful, false if dictionary is already released.
+// Uses generation counter to prevent ABA problem where dictionary is freed and reallocated.
+func (cd *CDict) acquireRef() bool {
+	for {
+		// Read generation first to establish ordering
+		generation := atomic.LoadInt64(&cd.generation)
+		
+		if atomic.LoadInt64(&cd.released) != 0 {
+			return false // Dictionary already released
+		}
+		
+		oldCount := atomic.LoadInt64(&cd.refCount)
+		if oldCount <= 0 {
+			return false // Invalid reference count
+		}
+		
+		if atomic.CompareAndSwapInt64(&cd.refCount, oldCount, oldCount+1) {
+			// Verify generation hasn't changed (prevents ABA problem)
+			if atomic.LoadInt64(&cd.generation) != generation {
+				// Dictionary was released and possibly reallocated, undo
+				atomic.AddInt64(&cd.refCount, -1)
+				return false
+			}
+			
+			// Double-check released flag after incrementing
+			if atomic.LoadInt64(&cd.released) != 0 {
+				// Dictionary was released after we incremented, undo
+				atomic.AddInt64(&cd.refCount, -1)
+				return false
+			}
+			return true
+		}
+	}
+}
+
+// releaseRef safely releases a reference to the dictionary.
+// Frees the dictionary if this was the last reference.
+func (cd *CDict) releaseRef() {
+	newCount := atomic.AddInt64(&cd.refCount, -1)
+	if newCount == 0 {
+		// Last reference - free the dictionary
+		if cd.p != nil {
+			result := C.ZSTD_freeCDict(cd.p)
+			ensureNoError("ZSTD_freeCDict", result)
+			cd.p = nil
+		}
+	} else if newCount < 0 {
+		panic("BUG: CDict reference count went negative")
+	}
+}
+
 // Release releases resources occupied by cd.
 //
 // cd cannot be used after the release.
 func (cd *CDict) Release() {
-	if cd.p == nil {
+	if cd == nil {
 		return
 	}
-	result := C.ZSTD_freeCDict(cd.p)
-	ensureNoError("ZSTD_freeCDict", result)
-	cd.p = nil
+	// Mark as released to prevent new references
+	if !atomic.CompareAndSwapInt64(&cd.released, 0, 1) {
+		return // Already released
+	}
+	// Increment generation to prevent ABA problem
+	atomic.AddInt64(&cd.generation, 1)
+	// Release our initial reference
+	cd.releaseRef()
 }
 
 func freeCDict(v interface{}) {
@@ -164,7 +228,10 @@ func freeCDict(v interface{}) {
 //
 // A single DDict may be re-used in concurrently running goroutines.
 type DDict struct {
-	p *C.ZSTD_DDict
+	p          *C.ZSTD_DDict
+	refCount   int64  // atomic reference counter
+	released   int64  // atomic flag indicating if dictionary is released
+	generation int64  // atomic generation counter to prevent ABA problem
 }
 
 // NewDDict creates new DDict from the given dict.
@@ -179,6 +246,9 @@ func NewDDict(dict []byte) (*DDict, error) {
 		p: C.ZSTD_createDDict_wrapper(
 			unsafe.Pointer(&dict[0]),
 			C.size_t(len(dict))),
+		refCount:   1, // Start with 1 reference
+		released:   0,
+		generation: 0, // Start with generation 0
 	}
 	// Prevent from GC'ing of dict during CGO call above.
 	runtime.KeepAlive(dict)
@@ -186,17 +256,73 @@ func NewDDict(dict []byte) (*DDict, error) {
 	return dd, nil
 }
 
+// acquireRef safely acquires a reference to the dictionary.
+// Returns true if successful, false if dictionary is already released.
+// Uses generation counter to prevent ABA problem where dictionary is freed and reallocated.
+func (dd *DDict) acquireRef() bool {
+	for {
+		// Read generation first to establish ordering
+		generation := atomic.LoadInt64(&dd.generation)
+		
+		if atomic.LoadInt64(&dd.released) != 0 {
+			return false // Dictionary already released
+		}
+		
+		oldCount := atomic.LoadInt64(&dd.refCount)
+		if oldCount <= 0 {
+			return false // Invalid reference count
+		}
+		
+		if atomic.CompareAndSwapInt64(&dd.refCount, oldCount, oldCount+1) {
+			// Verify generation hasn't changed (prevents ABA problem)
+			if atomic.LoadInt64(&dd.generation) != generation {
+				// Dictionary was released and possibly reallocated, undo
+				atomic.AddInt64(&dd.refCount, -1)
+				return false
+			}
+			
+			// Double-check released flag after incrementing
+			if atomic.LoadInt64(&dd.released) != 0 {
+				// Dictionary was released after we incremented, undo
+				atomic.AddInt64(&dd.refCount, -1)
+				return false
+			}
+			return true
+		}
+	}
+}
+
+// releaseRef safely releases a reference to the dictionary.
+// Frees the dictionary if this was the last reference.
+func (dd *DDict) releaseRef() {
+	newCount := atomic.AddInt64(&dd.refCount, -1)
+	if newCount == 0 {
+		// Last reference - free the dictionary
+		if dd.p != nil {
+			result := C.ZSTD_freeDDict(dd.p)
+			ensureNoError("ZSTD_freeDDict", result)
+			dd.p = nil
+		}
+	} else if newCount < 0 {
+		panic("BUG: DDict reference count went negative")
+	}
+}
+
 // Release releases resources occupied by dd.
 //
 // dd cannot be used after the release.
 func (dd *DDict) Release() {
-	if dd.p == nil {
+	if dd == nil {
 		return
 	}
-
-	result := C.ZSTD_freeDDict(dd.p)
-	ensureNoError("ZSTD_freeDDict", result)
-	dd.p = nil
+	// Mark as released to prevent new references
+	if !atomic.CompareAndSwapInt64(&dd.released, 0, 1) {
+		return // Already released
+	}
+	// Increment generation to prevent ABA problem
+	atomic.AddInt64(&dd.generation, 1)
+	// Release our initial reference
+	dd.releaseRef()
 }
 
 func freeDDict(v interface{}) {
@@ -235,6 +361,9 @@ func NewCDictByRefLevel(dict []byte, compressionLevel int) (*CDict, error) {
 			C.size_t(len(dict)),
 			C.int(compressionLevel)),
 		compressionLevel: compressionLevel,
+		refCount:         1, // Start with 1 reference
+		released:         0,
+		generation:       0, // Start with generation 0
 	}
 	// Prevent from GC'ing of dict during CGO call above.
 	// IMPORTANT: The caller must ensure dict remains valid for the lifetime of the CDict
@@ -260,6 +389,9 @@ func NewDDictByRef(dict []byte) (*DDict, error) {
 		p: C.ZSTD_createDDict_byReference_wrapper(
 			unsafe.Pointer(&dict[0]),
 			C.size_t(len(dict))),
+		refCount:   1, // Start with 1 reference
+		released:   0,
+		generation: 0, // Start with generation 0
 	}
 	// Prevent from GC'ing of dict during CGO call above.
 	// IMPORTANT: The caller must ensure dict remains valid for the lifetime of the DDict

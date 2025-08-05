@@ -138,6 +138,48 @@ const (
 	/* When applicable, dictionary's ID is written into frame header (default:1) */
 	ZSTD_c_dictIDFlag = 202
 
+	/* Target compressed block size : v1.5.6+
+	 * Attempts to fit compressed block size to be around targetCBlockSize.
+	 * No guarantee on compressed block size (default:0 == disabled) */
+	ZSTD_c_targetCBlockSize = 130
+	
+	/* Rsync-friendly mode : v1.5.6+
+	 * Creates periodical synchronization points to make compressed data 
+	 * more suitable for rsync delta transfers (default:0 == disabled)
+	 * NOTE: rsyncable mode only works when multithreading is enabled */
+	ZSTD_c_rsyncable = 500
+	
+	/* Advanced streaming parameters */
+	
+	/* User's best guess of source size : experimental
+	 * Hint is not valid when srcSizeHint == 0.
+	 * Helps compression ratio when guess is close to actual source size */
+	ZSTD_c_srcSizeHint = 1004
+	
+	/* Stable input buffer : experimental  
+	 * Tells compressor that input data will ALWAYS be the same between calls.
+	 * Avoids memcpy() from input buffer but requires strict buffer management */
+	ZSTD_c_stableInBuffer = 1006
+	
+	/* Stable output buffer : experimental
+	 * Tells compressor that output buffer will not be resized between calls.
+	 * Allows direct compression to output buffer without intermediate copies */
+	ZSTD_c_stableOutBuffer = 1007
+	
+	/* External sequence producer API parameters */
+	
+	/* Block delimiters mode for sequence compression : experimental
+	 * Controls how block boundaries are handled in sequence arrays */
+	ZSTD_c_blockDelimiters = 1008
+	
+	/* Sequence validation : experimental  
+	 * Enable validation of external sequences for safety */
+	ZSTD_c_validateSequences = 1009
+	
+	/* External sequence producer fallback : experimental
+	 * Enable fallback to internal producer if external producer fails */
+	ZSTD_c_enableSeqProducerFallback = 1014
+
 	/* multi-threading parameters */
 	/* These parameters are only useful if multi-threading is enabled (compiled with build macro ZSTD_MULTITHREAD).
 	 * They return an error otherwise. */
@@ -180,6 +222,15 @@ const (
 	ZSTD_reset_session_only           = 1
 	ZSTD_reset_parameters             = 2
 	ZSTD_reset_session_and_parameters = 3
+)
+
+type ZSTD_SequenceFormat int
+
+const (
+	// ZSTD_Sequence[] has no block delimiters, just sequences
+	ZSTD_sf_noBlockDelimiters = 0
+	// ZSTD_Sequence[] contains explicit block delimiters
+	ZSTD_sf_explicitBlockDelimiters = 1
 )
 
 type ZSTD_CompressionStrategy int

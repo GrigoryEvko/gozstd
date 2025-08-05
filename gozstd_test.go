@@ -792,7 +792,7 @@ func TestAdvancedAPIErrorCases(t *testing.T) {
 			name:        "too_high_compression_level",
 			param:       ZSTD_c_compressionLevel,
 			value:       25,
-			expectError: false, // Will be clamped to max
+			expectError: true, // Correctly rejected by parameter validation
 		},
 		{
 			name:        "invalid_strategy",
