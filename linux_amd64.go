@@ -1,3 +1,4 @@
+//go:build linux && amd64 && !musl
 // +build linux,amd64,!musl
 
 package gozstd

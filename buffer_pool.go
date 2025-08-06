@@ -37,7 +37,7 @@ func GetBuffer(minCapacity int) []byte {
 	if minCapacity <= 0 {
 		return nil
 	}
-	
+
 	// Find the appropriate size class
 	for i, pool := range globalBufferPool.pools {
 		poolSize := 1024 << i
@@ -50,7 +50,7 @@ func GetBuffer(minCapacity int) []byte {
 			return make([]byte, 0, poolSize)
 		}
 	}
-	
+
 	// For very large buffers (>512KB), allocate directly
 	return make([]byte, 0, minCapacity)
 }
@@ -61,29 +61,29 @@ func PutBuffer(buf []byte) {
 	if buf == nil {
 		return
 	}
-	
+
 	capacity := cap(buf)
-	
+
 	// Find matching pool by capacity
 	for i, pool := range globalBufferPool.pools {
 		if pool == nil {
 			continue // Skip nil pools
 		}
-		
+
 		poolSize := 1024 << i
 		if poolSize == capacity {
 			// Check if pool is not too full
 			if atomic.LoadInt64(&globalBufferPool.counts[i]) < globalBufferPool.maxItems {
 				// Reset to zero length (no need to clear data - new users will overwrite)
 				buf = buf[:0]
-				
+
 				pool.Put(buf)
 				atomic.AddInt64(&globalBufferPool.counts[i], 1)
 			}
 			return
 		}
 	}
-	
+
 	// Non-standard size, let GC handle it
 }
 
@@ -111,30 +111,30 @@ func OptimizeBuffer(buf []byte) []byte {
 	if buf == nil {
 		return nil
 	}
-	
+
 	length := len(buf)
 	capacity := cap(buf)
-	
+
 	// Only optimize if waste is significant (>50% of capacity unused)
 	if capacity > length*2 && length > 0 {
 		// Get a more appropriately sized buffer
 		newBuf := GetBuffer(length)
 		copy(newBuf[:cap(newBuf)], buf)
-		
+
 		// Return old buffer to pool
 		PutBuffer(buf[:0])
-		
+
 		return newBuf[:length]
 	}
-	
+
 	return buf
 }
 
 // BufferPoolStats returns statistics about buffer pool usage
 type BufferPoolStats struct {
-	PoolCounts    []int64 // Items in each pool
-	TotalBuffers  int64   // Total buffers across all pools
-	PoolSizes     []int   // Size of each pool in bytes
+	PoolCounts   []int64 // Items in each pool
+	TotalBuffers int64   // Total buffers across all pools
+	PoolSizes    []int   // Size of each pool in bytes
 }
 
 // GetStats returns current buffer pool statistics
@@ -143,13 +143,13 @@ func GetBufferPoolStats() BufferPoolStats {
 		PoolCounts: make([]int64, len(globalBufferPool.pools)),
 		PoolSizes:  make([]int, len(globalBufferPool.pools)),
 	}
-	
+
 	for i := range globalBufferPool.pools {
 		stats.PoolCounts[i] = atomic.LoadInt64(&globalBufferPool.counts[i])
 		stats.TotalBuffers += stats.PoolCounts[i]
 		stats.PoolSizes[i] = 1024 << i
 	}
-	
+
 	return stats
 }
 

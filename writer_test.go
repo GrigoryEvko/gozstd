@@ -516,7 +516,7 @@ func TestWriterMultiThreading(t *testing.T) {
 
 			var bb bytes.Buffer
 			zw := NewWriterParams(&bb, params)
-			
+
 			// Write the data
 			n, err := zw.Write(data)
 			if err != nil {

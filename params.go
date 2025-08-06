@@ -142,40 +142,40 @@ const (
 	 * Attempts to fit compressed block size to be around targetCBlockSize.
 	 * No guarantee on compressed block size (default:0 == disabled) */
 	ZSTD_c_targetCBlockSize = 130
-	
+
 	/* Rsync-friendly mode : v1.5.6+
-	 * Creates periodical synchronization points to make compressed data 
+	 * Creates periodical synchronization points to make compressed data
 	 * more suitable for rsync delta transfers (default:0 == disabled)
 	 * NOTE: rsyncable mode only works when multithreading is enabled */
 	ZSTD_c_rsyncable = 500
-	
+
 	/* Advanced streaming parameters */
-	
+
 	/* User's best guess of source size : experimental
 	 * Hint is not valid when srcSizeHint == 0.
 	 * Helps compression ratio when guess is close to actual source size */
 	ZSTD_c_srcSizeHint = 1004
-	
-	/* Stable input buffer : experimental  
+
+	/* Stable input buffer : experimental
 	 * Tells compressor that input data will ALWAYS be the same between calls.
 	 * Avoids memcpy() from input buffer but requires strict buffer management */
 	ZSTD_c_stableInBuffer = 1006
-	
+
 	/* Stable output buffer : experimental
 	 * Tells compressor that output buffer will not be resized between calls.
 	 * Allows direct compression to output buffer without intermediate copies */
 	ZSTD_c_stableOutBuffer = 1007
-	
+
 	/* External sequence producer API parameters */
-	
+
 	/* Block delimiters mode for sequence compression : experimental
 	 * Controls how block boundaries are handled in sequence arrays */
 	ZSTD_c_blockDelimiters = 1008
-	
-	/* Sequence validation : experimental  
+
+	/* Sequence validation : experimental
 	 * Enable validation of external sequences for safety */
 	ZSTD_c_validateSequences = 1009
-	
+
 	/* External sequence producer fallback : experimental
 	 * Enable fallback to internal producer if external producer fails */
 	ZSTD_c_enableSeqProducerFallback = 1014

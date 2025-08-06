@@ -19,7 +19,7 @@ func main() {
 
 	// Set various compression parameters
 	fmt.Println("Setting compression parameters:")
-	
+
 	// Set compression level
 	err := cctx.SetParameter(gozstd.ZSTD_c_compressionLevel, 19)
 	if err != nil {
@@ -80,7 +80,7 @@ func main() {
 
 	// Demonstrate reset functionality
 	fmt.Println("\n--- Demonstrating Context Reset ---")
-	
+
 	// Reset only the session (keeps parameters)
 	err = cctx.Reset(gozstd.ZSTD_reset_session_only)
 	if err != nil {
@@ -97,10 +97,10 @@ func main() {
 
 	// Demonstrate pledged size
 	fmt.Println("\n--- Demonstrating Pledged Size ---")
-	
+
 	// Reset session
 	cctx.Reset(gozstd.ZSTD_reset_session_only)
-	
+
 	// Set pledged size (tells compressor the exact input size)
 	pledgedData := []byte("Data with known size")
 	err = cctx.SetPledgedSrcSize(uint64(len(pledgedData)))

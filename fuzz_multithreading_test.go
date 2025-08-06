@@ -217,7 +217,7 @@ func TestMultiThreadStress(t *testing.T) {
 
 	// Test parameters
 	workerCounts := []int{0, 1, 2, 4, 8}
-	jobSizes := []int{0, 1024, 32*1024, 128*1024}
+	jobSizes := []int{0, 1024, 32 * 1024, 128 * 1024}
 	overlapLogs := []int{0, 1, 2, 3}
 
 	for _, workers := range workerCounts {
@@ -263,7 +263,7 @@ func TestMultiThreadStress(t *testing.T) {
 
 					ratio := float64(compressed.Len()) / float64(len(data)) * 100
 					t.Logf("Parameters: workers=%d, jobSize=%d, overlapLog=%d", workers, jobSize, overlapLog)
-					t.Logf("Performance: %.2fms, ratio=%.2f%%, compressed=%d bytes", 
+					t.Logf("Performance: %.2fms, ratio=%.2f%%, compressed=%d bytes",
 						float64(duration.Nanoseconds())/1e6, ratio, compressed.Len())
 				})
 			}
@@ -278,26 +278,26 @@ func TestRaceConditionDetection(t *testing.T) {
 	}
 
 	data := bytes.Repeat([]byte("test data for race detection "), 1000)
-	
+
 	const numGoroutines = 10
 	var wg sync.WaitGroup
-	
+
 	// Test concurrent writer creation and usage
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			
+
 			params := &WriterParams{
 				CompressionLevel: 1 + (idx % 5),
 				NbWorkers:        1 + (idx % 4),
 				JobSize:          1024 * (1 + idx%10),
 				OverlapLog:       idx % 4,
 			}
-			
+
 			var compressed bytes.Buffer
 			writer := NewWriterParams(&compressed, params)
-			
+
 			// Write in chunks to stress the system more
 			chunkSize := 100 + (idx * 50)
 			for pos := 0; pos < len(data); pos += chunkSize {
@@ -305,32 +305,32 @@ func TestRaceConditionDetection(t *testing.T) {
 				if end > len(data) {
 					end = len(data)
 				}
-				
+
 				if _, err := writer.Write(data[pos:end]); err != nil {
 					t.Errorf("Goroutine %d: Write failed: %v", idx, err)
 					return
 				}
 			}
-			
+
 			if err := writer.Close(); err != nil {
 				t.Errorf("Goroutine %d: Close failed: %v", idx, err)
 				return
 			}
 			writer.Release()
-			
+
 			// Verify decompression
 			decompressed, err := Decompress(nil, compressed.Bytes())
 			if err != nil {
 				t.Errorf("Goroutine %d: Decompress failed: %v", idx, err)
 				return
 			}
-			
+
 			if !bytes.Equal(data, decompressed) {
 				t.Errorf("Goroutine %d: Data mismatch", idx)
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 }
 

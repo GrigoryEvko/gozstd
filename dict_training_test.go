@@ -14,8 +14,8 @@ func TestEnhancedDictionaryTraining(t *testing.T) {
 
 	t.Run("BuildDictCover", func(t *testing.T) {
 		params := DefaultCoverParams()
-		params.K = 32  // Small segment size for test data
-		params.D = 6   // Small d-mer size
+		params.K = 32                // Small segment size for test data
+		params.D = 6                 // Small d-mer size
 		params.NotificationLevel = 0 // Silent
 
 		dict, err := BuildDictCover(samples, desiredDictLen, params)
@@ -42,8 +42,8 @@ func TestEnhancedDictionaryTraining(t *testing.T) {
 
 	t.Run("BuildDictCoverOptimized", func(t *testing.T) {
 		params := DefaultCoverParams()
-		params.K = 0  // Let optimization find optimal K
-		params.D = 0  // Let optimization find optimal D
+		params.K = 0      // Let optimization find optimal K
+		params.D = 0      // Let optimization find optimal D
 		params.Steps = 10 // Fewer steps for faster testing
 		params.NotificationLevel = 0
 
@@ -76,9 +76,9 @@ func TestEnhancedDictionaryTraining(t *testing.T) {
 
 	t.Run("BuildDictFastCover", func(t *testing.T) {
 		params := DefaultFastCoverParams()
-		params.K = 32  // Small segment size for test data
-		params.D = 6   // Small d-mer size
-		params.F = 12  // Smaller frequency array for test
+		params.K = 32 // Small segment size for test data
+		params.D = 6  // Small d-mer size
+		params.F = 12 // Smaller frequency array for test
 		params.NotificationLevel = 0
 
 		dict, err := BuildDictFastCover(samples, desiredDictLen, params)
@@ -101,9 +101,9 @@ func TestEnhancedDictionaryTraining(t *testing.T) {
 
 	t.Run("BuildDictFastCoverOptimized", func(t *testing.T) {
 		params := DefaultFastCoverParams()
-		params.K = 0  // Let optimization find optimal K
-		params.D = 0  // Let optimization find optimal D
-		params.F = 0  // Let optimization use default F
+		params.K = 0      // Let optimization find optimal K
+		params.D = 0      // Let optimization find optimal D
+		params.F = 0      // Let optimization use default F
 		params.Steps = 10 // Fewer steps for faster testing
 		params.NotificationLevel = 0
 
@@ -134,7 +134,7 @@ func TestEnhancedDictionaryTraining(t *testing.T) {
 		}
 
 		t.Logf("Optimized FastCover dictionary: %d bytes, K=%d, D=%d, F=%d, Accel=%d",
-			len(result.Dictionary), result.OptimizedParams.K, result.OptimizedParams.D, 
+			len(result.Dictionary), result.OptimizedParams.K, result.OptimizedParams.D,
 			result.OptimizedParams.F, result.OptimizedParams.Accel)
 	})
 
@@ -168,8 +168,8 @@ func TestDictionaryTrainingParameters(t *testing.T) {
 	t.Run("CoverParameterValidation", func(t *testing.T) {
 		// Test invalid parameters
 		invalidParams := []CoverParams{
-			{K: 0, D: 6}, // K cannot be 0
-			{K: 32, D: 0}, // D cannot be 0  
+			{K: 0, D: 6},   // K cannot be 0
+			{K: 32, D: 0},  // D cannot be 0
 			{K: 16, D: 32}, // D cannot be > K
 		}
 
@@ -184,8 +184,8 @@ func TestDictionaryTrainingParameters(t *testing.T) {
 	t.Run("FastCoverParameterValidation", func(t *testing.T) {
 		// Test invalid parameters
 		invalidParams := []FastCoverParams{
-			{K: 0, D: 6, F: 12}, // K cannot be 0
-			{K: 32, D: 0, F: 12}, // D cannot be 0
+			{K: 0, D: 6, F: 12},   // K cannot be 0
+			{K: 32, D: 0, F: 12},  // D cannot be 0
 			{K: 16, D: 32, F: 12}, // D cannot be > K
 		}
 
@@ -219,7 +219,7 @@ func TestDictionaryTrainingParameters(t *testing.T) {
 func TestDictionaryTrainingEdgeCases(t *testing.T) {
 	t.Run("EmptySamples", func(t *testing.T) {
 		params := DefaultFastCoverParams()
-		
+
 		// Test with no samples
 		_, err := BuildDictFastCover(nil, 1024, params)
 		if err == nil {
@@ -244,10 +244,10 @@ func TestDictionaryTrainingEdgeCases(t *testing.T) {
 		// Test with very small samples (should still work due to padding)
 		smallSamples := [][]byte{
 			[]byte("a"),
-			[]byte("b"), 
+			[]byte("b"),
 			[]byte("c"),
 		}
-		
+
 		params := DefaultFastCoverParams()
 		params.K = 16
 		params.D = 4
@@ -287,7 +287,7 @@ func TestDictionaryTrainingEdgeCases(t *testing.T) {
 func TestDictionaryCompressionComparison(t *testing.T) {
 	samples := createTestSamples()
 	testData := samples[0] // Use first sample for testing
-	
+
 	// Build dictionaries with different algorithms
 	algorithms := map[string]func() ([]byte, error){
 		"Basic": func() ([]byte, error) {
@@ -302,8 +302,8 @@ func TestDictionaryCompressionComparison(t *testing.T) {
 		},
 		"FastCoverOptimized": func() ([]byte, error) {
 			params := DefaultFastCoverParams()
-			params.K = 0 // Optimize
-			params.D = 0 // Optimize
+			params.K = 0     // Optimize
+			params.D = 0     // Optimize
 			params.Steps = 5 // Few steps for speed
 			params.NotificationLevel = 0
 			result, err := BuildDictFastCoverOptimized(samples, 2048, params)
@@ -336,7 +336,7 @@ func TestDictionaryCompressionComparison(t *testing.T) {
 		}
 
 		compressionResults[name] = ratio
-		t.Logf("Algorithm %s: dictionary %d bytes, compression ratio %.2fx", 
+		t.Logf("Algorithm %s: dictionary %d bytes, compression ratio %.2fx",
 			name, len(dict), ratio)
 	}
 
@@ -349,7 +349,7 @@ func TestDictionaryCompressionComparison(t *testing.T) {
 	if basicRatio, ok := compressionResults["Basic"]; ok {
 		if fastCoverRatio, ok := compressionResults["FastCover"]; ok {
 			if fastCoverRatio < basicRatio*0.8 { // Allow some tolerance
-				t.Logf("FastCover ratio (%.2fx) significantly worse than Basic (%.2fx)", 
+				t.Logf("FastCover ratio (%.2fx) significantly worse than Basic (%.2fx)",
 					fastCoverRatio, basicRatio)
 			}
 		}
@@ -399,11 +399,11 @@ func createTestSamples() [][]byte {
 	}
 
 	var samples [][]byte
-	
+
 	for i := 0; i < 100; i++ {
 		var sample strings.Builder
 		sample.WriteString(fmt.Sprintf(`{"record_id": %d, `, i))
-		
+
 		// Add common fields with variations
 		for j, pattern := range basePatterns {
 			if j < len(basePatterns)-1 {
@@ -413,13 +413,13 @@ func createTestSamples() [][]byte {
 			}
 		}
 		sample.WriteString("}")
-		
+
 		samples = append(samples, []byte(sample.String()))
 	}
 
 	// Add some additional structured data
 	for i := 0; i < 50; i++ {
-		xmlSample := fmt.Sprintf(`<root><user id="%d"><name>user_%d</name><email>user_%d@example.com</email><status>active</status></user></root>`, 
+		xmlSample := fmt.Sprintf(`<root><user id="%d"><name>user_%d</name><email>user_%d@example.com</email><status>active</status></user></root>`,
 			i, i%20, i%20)
 		samples = append(samples, []byte(xmlSample))
 	}
@@ -471,9 +471,9 @@ func testCompressionRatio(dict []byte, testData []byte) (float64, error) {
 
 	dictCompressed := CompressDict(nil, testData, cdict)
 
-	// Calculate compression ratio  
+	// Calculate compression ratio
 	dictRatio := float64(len(testData)) / float64(len(dictCompressed))
-	
+
 	return dictRatio, nil
 }
 
@@ -510,8 +510,8 @@ func BenchmarkDictionaryTraining(b *testing.B) {
 
 	b.Run("FastCoverOptimized", func(b *testing.B) {
 		params := DefaultFastCoverParams()
-		params.K = 0 // Optimize
-		params.D = 0 // Optimize 
+		params.K = 0     // Optimize
+		params.D = 0     // Optimize
 		params.Steps = 5 // Fewer steps for benchmarking
 		params.NotificationLevel = 0
 

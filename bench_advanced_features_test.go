@@ -13,16 +13,16 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 
 	for _, blockSize := range blockSizes {
 		data := newBenchString(blockSize)
-		
+
 		b.Run(fmt.Sprintf("blockSize_%d", blockSize), func(b *testing.B) {
 			for _, level := range levels {
 				b.Run(fmt.Sprintf("level_%d", level), func(b *testing.B) {
-					
+
 					// Benchmark Rsync-friendly compression
 					b.Run("RsyncFriendly", func(b *testing.B) {
 						cctx := NewCCtx()
 						defer cctx.Release()
-						
+
 						// Enable rsync-friendly mode with multi-threading
 						if err := cctx.SetParameter(ZSTD_c_nbWorkers, 2); err != nil {
 							b.Fatalf("failed to set nbWorkers: %v", err)
@@ -33,11 +33,11 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 						if err := cctx.SetParameter(ZSTD_c_compressionLevel, level); err != nil {
 							b.Fatalf("failed to set compression level: %v", err)
 						}
-						
+
 						b.ResetTimer()
 						b.SetBytes(int64(blockSize))
 						b.ReportAllocs()
-						
+
 						for i := 0; i < b.N; i++ {
 							compressed, err := cctx.Compress(nil, data)
 							if err != nil {
@@ -54,17 +54,17 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 					b.Run("AdvancedStreaming", func(b *testing.B) {
 						cctx := NewCCtx()
 						defer cctx.Release()
-						
+
 						// Enable advanced streaming parameters
 						cctx.SetSourceSizeHint(uint64(len(data)))
 						cctx.SetStableInputBuffer(true)
 						cctx.SetStableOutputBuffer(true)
 						cctx.SetParameter(ZSTD_c_compressionLevel, level)
-						
+
 						b.ResetTimer()
 						b.SetBytes(int64(blockSize))
 						b.ReportAllocs()
-						
+
 						for i := 0; i < b.N; i++ {
 							compressed, err := cctx.Compress(nil, data)
 							if err != nil {
@@ -80,22 +80,22 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 					b.Run("SequenceProducer", func(b *testing.B) {
 						cctx := NewCCtx()
 						defer cctx.Release()
-						
+
 						// Register simple sequence producer
 						err := cctx.RegisterSequenceProducer(SimpleSequenceProducer)
 						if err != nil {
 							b.Fatalf("failed to register sequence producer: %v", err)
 						}
 						defer cctx.ClearSequenceProducer()
-						
+
 						cctx.SetParameter(ZSTD_c_compressionLevel, level)
 						cctx.SetSequenceValidation(true)
 						cctx.SetSequenceProducerFallback(true)
-						
+
 						b.ResetTimer()
 						b.SetBytes(int64(blockSize))
 						b.ReportAllocs()
-						
+
 						for i := 0; i < b.N; i++ {
 							compressed, err := cctx.Compress(nil, data)
 							if err != nil {
@@ -111,11 +111,11 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 					b.Run("FrameInspection", func(b *testing.B) {
 						// Pre-compress data for inspection
 						compressed := CompressLevel(nil, data, level)
-						
+
 						b.ResetTimer()
 						b.SetBytes(int64(len(compressed)))
 						b.ReportAllocs()
-						
+
 						for i := 0; i < b.N; i++ {
 							// Test all frame inspection functions
 							size, err := GetFrameContentSize(compressed)
@@ -125,7 +125,7 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 							if size != uint64(len(data)) {
 								b.Fatalf("size mismatch: got %d, want %d", size, len(data))
 							}
-							
+
 							compSize, err := GetFrameCompressedSize(compressed)
 							if err != nil {
 								b.Fatalf("GetFrameCompressedSize failed: %v", err)
@@ -133,7 +133,7 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 							if compSize != uint64(len(compressed)) {
 								b.Fatalf("compressed size mismatch: got %d, want %d", compSize, len(compressed))
 							}
-							
+
 							// Legacy function (should be same as GetFrameContentSize)
 							legacySize := GetDecompressedSize(compressed)
 							if legacySize != uint64(len(data)) {
@@ -156,7 +156,7 @@ func BenchmarkEnhancedDictionaryPerformance(b *testing.B) {
 	b.Run("FastCover", func(b *testing.B) {
 		params := DefaultFastCoverParams()
 		params.NotificationLevel = 0
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			dict, err := BuildDictFastCover(samples, dictSize, params)
@@ -171,11 +171,11 @@ func BenchmarkEnhancedDictionaryPerformance(b *testing.B) {
 
 	b.Run("FastCoverOptimized", func(b *testing.B) {
 		params := DefaultFastCoverParams()
-		params.K = 0 // Enable optimization
-		params.D = 0 // Enable optimization
+		params.K = 0     // Enable optimization
+		params.D = 0     // Enable optimization
 		params.Steps = 5 // Fewer steps for benchmarking
 		params.NotificationLevel = 0
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			result, err := BuildDictFastCoverOptimized(samples, dictSize, params)
@@ -191,7 +191,7 @@ func BenchmarkEnhancedDictionaryPerformance(b *testing.B) {
 	b.Run("Cover", func(b *testing.B) {
 		params := DefaultCoverParams()
 		params.NotificationLevel = 0
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			dict, err := BuildDictCover(samples, dictSize, params)

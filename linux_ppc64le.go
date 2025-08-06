@@ -1,3 +1,4 @@
+//go:build linux && ppc64le
 // +build linux,ppc64le
 
 package gozstd

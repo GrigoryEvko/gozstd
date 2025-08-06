@@ -511,7 +511,7 @@ func TestAdvancedAPIAllParameters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			// Apply all parameters
 			for param, value := range tt.parameters {
 				err := ctx.SetParameter(param, value)
@@ -561,12 +561,12 @@ func TestAdvancedAPIStrategies(t *testing.T) {
 	for _, s := range strategies {
 		t.Run(s.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			err := ctx.SetParameter(ZSTD_c_compressionLevel, 3)
 			if err != nil {
 				t.Fatalf("cannot set compression level: %s", err)
 			}
-			
+
 			err = ctx.SetParameter(ZSTD_c_strategy, int(s.strategy))
 			if err != nil {
 				t.Fatalf("cannot set strategy %s: %s", s.name, err)
@@ -604,11 +604,11 @@ func TestAdvancedAPIReset(t *testing.T) {
 	for _, rd := range resetDirectives {
 		t.Run(rd.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			// Set some parameters
 			ctx.SetParameter(ZSTD_c_compressionLevel, 5)
 			ctx.SetParameter(ZSTD_c_checksumFlag, 1)
-			
+
 			// Compress once
 			compressed1, err := ctx.Compress(nil, testData)
 			if err != nil {
@@ -632,7 +632,7 @@ func TestAdvancedAPIReset(t *testing.T) {
 			if err != nil {
 				t.Fatalf("first decompression failed: %s", err)
 			}
-			
+
 			decompressed2, err := Decompress(nil, compressed2)
 			if err != nil {
 				t.Fatalf("second decompression failed: %s", err)
@@ -647,10 +647,10 @@ func TestAdvancedAPIReset(t *testing.T) {
 
 func TestAdvancedAPIPledgedSrcSize(t *testing.T) {
 	tests := []struct {
-		name         string
-		data         []byte
-		pledgedSize  uint64
-		expectError  bool
+		name        string
+		data        []byte
+		pledgedSize uint64
+		expectError bool
 	}{
 		{
 			name:        "exact_size",
@@ -675,7 +675,7 @@ func TestAdvancedAPIPledgedSrcSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			err := ctx.SetPledgedSrcSize(tt.pledgedSize)
 			if err != nil {
 				t.Fatalf("cannot set pledged size: %s", err)
@@ -704,7 +704,7 @@ func TestAdvancedAPIMultiThreading(t *testing.T) {
 	// Note: Multi-threading parameters require ZSTD_MULTITHREAD=1 during compilation
 	// These tests verify the API works but may not actually use multiple threads
 	// if the library wasn't compiled with multi-threading support
-	
+
 	largeData := bytes.Repeat([]byte("Multi-threading test data. "), 10000)
 
 	tests := []struct {
@@ -736,7 +736,7 @@ func TestAdvancedAPIMultiThreading(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			// Set multi-threading parameters
 			err := ctx.SetParameter(ZSTD_c_nbWorkers, tt.nbWorkers)
 			if err != nil {
@@ -811,7 +811,7 @@ func TestAdvancedAPIErrorCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
-			
+
 			err := ctx.SetParameter(tt.param, tt.value)
 			if (err != nil) != tt.expectError {
 				t.Fatalf("error mismatch: got %v, expectError %v", err, tt.expectError)

@@ -1,3 +1,4 @@
+//go:build linux && arm64 && musl
 // +build linux,arm64,musl
 
 package gozstd

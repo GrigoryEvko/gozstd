@@ -114,9 +114,9 @@ var buildDictLock sync.Mutex
 type CDict struct {
 	p                *C.ZSTD_CDict
 	compressionLevel int
-	refCount         int64  // atomic reference counter
-	released         int64  // atomic flag indicating if dictionary is released
-	generation       int64  // atomic generation counter to prevent ABA problem
+	refCount         int64 // atomic reference counter
+	released         int64 // atomic flag indicating if dictionary is released
+	generation       int64 // atomic generation counter to prevent ABA problem
 }
 
 // NewCDict creates new CDict from the given dict.
@@ -158,16 +158,16 @@ func (cd *CDict) acquireRef() bool {
 	for {
 		// Read generation first to establish ordering
 		generation := atomic.LoadInt64(&cd.generation)
-		
+
 		if atomic.LoadInt64(&cd.released) != 0 {
 			return false // Dictionary already released
 		}
-		
+
 		oldCount := atomic.LoadInt64(&cd.refCount)
 		if oldCount <= 0 {
 			return false // Invalid reference count
 		}
-		
+
 		if atomic.CompareAndSwapInt64(&cd.refCount, oldCount, oldCount+1) {
 			// Verify generation hasn't changed (prevents ABA problem)
 			if atomic.LoadInt64(&cd.generation) != generation {
@@ -175,7 +175,7 @@ func (cd *CDict) acquireRef() bool {
 				atomic.AddInt64(&cd.refCount, -1)
 				return false
 			}
-			
+
 			// Double-check released flag after incrementing
 			if atomic.LoadInt64(&cd.released) != 0 {
 				// Dictionary was released after we incremented, undo
@@ -229,9 +229,9 @@ func freeCDict(v interface{}) {
 // A single DDict may be re-used in concurrently running goroutines.
 type DDict struct {
 	p          *C.ZSTD_DDict
-	refCount   int64  // atomic reference counter
-	released   int64  // atomic flag indicating if dictionary is released
-	generation int64  // atomic generation counter to prevent ABA problem
+	refCount   int64 // atomic reference counter
+	released   int64 // atomic flag indicating if dictionary is released
+	generation int64 // atomic generation counter to prevent ABA problem
 }
 
 // NewDDict creates new DDict from the given dict.
@@ -263,16 +263,16 @@ func (dd *DDict) acquireRef() bool {
 	for {
 		// Read generation first to establish ordering
 		generation := atomic.LoadInt64(&dd.generation)
-		
+
 		if atomic.LoadInt64(&dd.released) != 0 {
 			return false // Dictionary already released
 		}
-		
+
 		oldCount := atomic.LoadInt64(&dd.refCount)
 		if oldCount <= 0 {
 			return false // Invalid reference count
 		}
-		
+
 		if atomic.CompareAndSwapInt64(&dd.refCount, oldCount, oldCount+1) {
 			// Verify generation hasn't changed (prevents ABA problem)
 			if atomic.LoadInt64(&dd.generation) != generation {
@@ -280,7 +280,7 @@ func (dd *DDict) acquireRef() bool {
 				atomic.AddInt64(&dd.refCount, -1)
 				return false
 			}
-			
+
 			// Double-check released flag after incrementing
 			if atomic.LoadInt64(&dd.released) != 0 {
 				// Dictionary was released after we incremented, undo

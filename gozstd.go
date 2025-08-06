@@ -50,7 +50,6 @@ import (
 // DefaultCompressionLevel is the default compression level.
 const DefaultCompressionLevel = 3 // Obtained from ZSTD_CLEVEL_DEFAULT.
 
-
 // Compress appends compressed src to dst and returns the result.
 func Compress(dst, src []byte) []byte {
 	return CompressDictLevel(dst, src, nil, DefaultCompressionLevel)
@@ -115,9 +114,9 @@ type cctxWrapper struct {
 }
 
 type CCtx struct {
-	*cctxWrapper  // Pointer to wrapper for proper pool lifecycle
-	paramsMutex   sync.RWMutex         // Protect concurrent access to currentParams
-	currentParams map[CParameter]int   // Track parameters for validation
+	*cctxWrapper                     // Pointer to wrapper for proper pool lifecycle
+	paramsMutex   sync.RWMutex       // Protect concurrent access to currentParams
+	currentParams map[CParameter]int // Track parameters for validation
 }
 
 // NewCCtx creates a new compression context.
@@ -140,12 +139,12 @@ func (ctx *CCtx) Release() {
 	}
 	// Reset the context to a clean state before returning to pool
 	ctx.Reset(ZSTD_reset_session_and_parameters)
-	
+
 	// CRITICAL BUG FIX: Clear parameter tracking before returning to pool
 	ctx.paramsMutex.Lock()
 	ctx.currentParams = make(map[CParameter]int)
 	ctx.paramsMutex.Unlock()
-	
+
 	// CRITICAL BUG FIX: Put the cctxWrapper pointer back in pool
 	// Now that cctxWrapper is a pointer field, we can put it directly
 	cctxPool.Put(ctx.cctxWrapper)
@@ -159,14 +158,14 @@ func (cctx *CCtx) Reset(reset ZSTD_ResetDirective) error {
 		ctx := ErrorContext{}
 		return mapZstdError(result, "reset context", ctx)
 	}
-	
+
 	// Clear parameter tracking when context is reset
 	if reset == ZSTD_reset_session_and_parameters || reset == ZSTD_reset_parameters {
 		cctx.paramsMutex.Lock()
 		cctx.currentParams = make(map[CParameter]int)
 		cctx.paramsMutex.Unlock()
 	}
-	
+
 	return nil
 }
 
@@ -178,37 +177,37 @@ func (cctx *CCtx) SetParameter(param CParameter, value int) error {
 	// CRITICAL FIX: Hold lock for entire operation to prevent race conditions
 	cctx.paramsMutex.Lock()
 	defer cctx.paramsMutex.Unlock()
-	
+
 	// Initialize currentParams if needed
 	if cctx.currentParams == nil {
 		cctx.currentParams = make(map[CParameter]int)
 	}
-	
+
 	// Create validation context with current parameters
 	currentParamsCopy := make(map[CParameter]int, len(cctx.currentParams))
 	for k, v := range cctx.currentParams {
 		currentParamsCopy[k] = v
 	}
-	
+
 	// CRITICAL: Validate parameter to prevent memory bomb attacks
 	ctx := &ValidationContext{
 		Architecture:  runtime.GOARCH,
 		CurrentParams: currentParamsCopy,
 	}
-	
+
 	// Perform comprehensive validation BEFORE calling ZSTD
 	if err := globalValidator.ValidateParameter(param, value, ctx); err != nil {
 		return err
 	}
-	
+
 	// Add new parameter to validation set
 	currentParamsCopy[param] = value
-	
+
 	// Validate parameter dependencies with new parameter included
 	if err := ValidateParameterDependencies(currentParamsCopy); err != nil {
 		return err
 	}
-	
+
 	// Call ZSTD with validated parameters
 	result := C.ZSTD_CCtx_setParameter(cctx.cctx,
 		C.ZSTD_cParameter(param), C.int(value))
@@ -219,10 +218,10 @@ func (cctx *CCtx) SetParameter(param CParameter, value int) error {
 		}
 		return mapZstdError(result, "set parameter", errorCtx)
 	}
-	
+
 	// Only update tracking after successful ZSTD call
 	cctx.currentParams[param] = value
-	
+
 	return nil
 }
 
@@ -339,27 +338,27 @@ func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressi
 	// Slow path - resize dst to fit compressed data using buffer pool
 	compressBound := int(C.ZSTD_compressBound(C.size_t(len(src)))) + 1
 	requiredTotal := dstLen + compressBound
-	
+
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
 		copy(newBuf, dst[:dstLen])
-		
+
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
 			PutBuffer(dst[:0])
 		}
-		
+
 		dst = newBuf[:dstLen]
 	}
 
 	result := compressInternal(cctx, cctxDict, dst[dstLen:dstLen+compressBound], src, cd, compressionLevel, true)
 	compressedSize := int(result)
 	dst = dst[:dstLen+compressedSize]
-	
+
 	// Optimize buffer to reduce memory waste
 	dst = OptimizeBuffer(dst)
-	
+
 	return dst
 }
 
@@ -367,14 +366,14 @@ func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
 	// ZSTD handles empty input correctly by creating valid frames, so don't skip it
 
 	dstLen := len(dst)
-	
+
 	// Build error context
 	ctx := ErrorContext{
-		InputSize:  len(src),
-		OutputSize: cap(dst) - dstLen,
+		InputSize:        len(src),
+		OutputSize:       cap(dst) - dstLen,
 		CompressionLevel: 0, // compress2 uses default level
 	}
-	
+
 	if cap(dst) > dstLen {
 		// Fast path - try compressing without dst resize.
 		result := compress2Internal(cctx, dst[dstLen:cap(dst)], src, false)
@@ -393,17 +392,17 @@ func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
 	// Slow path - resize dst to fit compressed data using buffer pool
 	compressBound := int(C.ZSTD_compressBound(C.size_t(len(src)))) + 1
 	requiredTotal := dstLen + compressBound
-	
+
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
 		copy(newBuf, dst[:dstLen])
-		
+
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
 			PutBuffer(dst[:0])
 		}
-		
+
 		dst = newBuf[:dstLen]
 	}
 
@@ -434,12 +433,12 @@ func compressInternal(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, c
 			return C.size_t(C.ZSTD_error_GENERIC) // Return generic error
 		}
 		defer cd.releaseRef()
-		
+
 		// Check again that dictionary pointer is valid
 		if cd.p == nil {
 			return C.size_t(C.ZSTD_error_GENERIC)
 		}
-		
+
 		result := C.ZSTD_compress_usingCDict_wrapper(
 			unsafe.Pointer(cctxDict.cctx),
 			unsafe.Pointer(dstHdr.Data),
@@ -474,7 +473,7 @@ func compressInternal(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, c
 func compress2Internal(cctx *cctxWrapper, dst, src []byte, mustSucceed bool) C.size_t {
 	dstHdr := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
 	srcHdr := (*reflect.SliceHeader)(unsafe.Pointer(&src))
-	
+
 	result := C.ZSTD_compress2_wrapper(
 		unsafe.Pointer(cctx.cctx),
 		unsafe.Pointer(dstHdr.Data),
@@ -548,7 +547,7 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 	// ZSTD creates valid 6-byte frames for empty input and handles all edge cases
 
 	dstLen := len(dst)
-	
+
 	// Build error context for better error reporting
 	ctx := ErrorContext{
 		InputSize:  len(src),
@@ -558,7 +557,7 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 		// Note: Would need to extract dictionary ID from frame if available
 		ctx.DictionaryID = 0 // Placeholder - actual extraction would be complex
 	}
-	
+
 	if cap(dst) > dstLen {
 		// Fast path - try decompressing without dst resize.
 		result := decompressInternal(dctx, dctxDict, dst[dstLen:cap(dst)], src, dd)
@@ -590,17 +589,17 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 	decompressBound++
 
 	requiredTotal := dstLen + decompressBound
-	
+
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetDecompressBuffer(requiredTotal)
 		copy(newBuf, dst[:dstLen])
-		
+
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
 			PutBuffer(dst[:0])
 		}
-		
+
 		dst = newBuf[:dstLen]
 	}
 
@@ -609,10 +608,10 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 	if decompressedSize >= 0 {
 		// Trust ZSTD's built-in memory bomb prevention
 		dst = dst[:dstLen+decompressedSize]
-		
+
 		// Optimize buffer to reduce memory waste
 		dst = OptimizeBuffer(dst)
-		
+
 		return dst, nil
 	}
 
@@ -633,12 +632,12 @@ func decompressInternal(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict)
 			return C.size_t(C.ZSTD_error_GENERIC)
 		}
 		defer dd.releaseRef()
-		
+
 		// Check again that dictionary pointer is valid
 		if dd.p == nil {
 			return C.size_t(C.ZSTD_error_GENERIC)
 		}
-		
+
 		n = C.ZSTD_decompress_usingDDict_wrapper(
 			unsafe.Pointer(dctxDict.dctx),
 			unsafe.Pointer(dstHdr.Data),
@@ -659,7 +658,6 @@ func decompressInternal(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict)
 	runtime.KeepAlive(src)
 	return n
 }
-
 
 func ensureNoError(funcName string, result C.size_t) {
 	if zstdIsError(result) {
@@ -684,9 +682,9 @@ func streamDecompress(dst, src []byte, dd *DDict) ([]byte, error) {
 	sd.src = src
 	_, err := sd.zr.WriteTo(sd)
 	dst = sd.dst
-	
+
 	// Trust ZSTD's built-in validation for stream decompression
-	
+
 	putStreamDecompressor(sd)
 	return dst, err
 }
@@ -738,4 +736,3 @@ func putStreamDecompressor(sd *streamDecompressor) {
 }
 
 var streamDecompressorPool sync.Pool
-
