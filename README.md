@@ -407,14 +407,6 @@ MIT License. See [LICENSE](LICENSE) file for details.
 - Facebook for creating the excellent [Zstandard](https://github.com/facebook/zstd) compression algorithm
 - The original [gozstd](https://github.com/valyala/gozstd) author for the initial implementation
 - All contributors who have helped improve this library
-
-## Users
-
-Notable projects using gozstd:
-
-- [VictoriaMetrics](https://github.com/VictoriaMetrics/VictoriaMetrics) - Fast, cost-effective monitoring solution
-- [Your Project Here] - Submit a PR to add your project!
-
 ---
 
 For bug reports and feature requests, please use the [GitHub Issues](https://github.com/GrigoryEvko/gozstd/issues) page.
