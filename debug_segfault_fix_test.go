@@ -200,10 +200,10 @@ func TestFutureZstdUpgrade(t *testing.T) {
 	// 3. Update the ZSTD version detection in the validation
 	// 4. Run comprehensive tests including the benchmark that originally crashed
 	// 5. Update documentation to reflect that rsync mode is safe again
-	
+
 	t.Log("Instructions for re-enabling rsync mode:")
 	t.Log("1. Upgrade ZSTD library to version > 1.5.7 with segfault fix")
-	t.Log("2. Update validateRsyncableRequirements() in params_validation.go") 
+	t.Log("2. Update validateRsyncableRequirements() in params_validation.go")
 	t.Log("3. Uncomment original validation logic")
 	t.Log("4. Remove temporary safety block")
 	t.Log("5. Run full test suite including BenchmarkAdvancedFeatures")

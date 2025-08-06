@@ -1,3 +1,4 @@
+//go:build illumos && amd64
 // +build illumos,amd64
 
 package gozstd

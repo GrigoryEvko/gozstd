@@ -27,11 +27,11 @@ import (
 
 // FrameInfo contains information about a ZSTD frame
 type FrameInfo struct {
-	ContentSize      uint64 // Uncompressed size, 0 if unknown
-	CompressedSize   uint64 // Compressed frame size
-	HasContentSize   bool   // Whether content size is available
-	HasChecksum      bool   // Whether frame has checksum
-	DictionaryID     uint32 // Dictionary ID, 0 if none
+	ContentSize    uint64 // Uncompressed size, 0 if unknown
+	CompressedSize uint64 // Compressed frame size
+	HasContentSize bool   // Whether content size is available
+	HasChecksum    bool   // Whether frame has checksum
+	DictionaryID   uint32 // Dictionary ID, 0 if none
 }
 
 // GetFrameContentSize returns the uncompressed content size from a ZSTD frame header.
@@ -43,7 +43,7 @@ func GetFrameContentSize(src []byte) (uint64, error) {
 	if len(src) == 0 {
 		return 0, fmt.Errorf("empty input")
 	}
-	
+
 	if len(src) < 4 {
 		return 0, fmt.Errorf("input too small for ZSTD frame header")
 	}
@@ -70,7 +70,7 @@ func GetFrameCompressedSize(src []byte) (uint64, error) {
 	if len(src) == 0 {
 		return 0, fmt.Errorf("empty input")
 	}
-	
+
 	if len(src) < 4 {
 		return 0, fmt.Errorf("input too small for ZSTD frame header")
 	}
@@ -121,7 +121,7 @@ func GetFrameInfo(src []byte) (*FrameInfo, error) {
 	if len(src) == 0 {
 		return nil, fmt.Errorf("empty input")
 	}
-	
+
 	if len(src) < 4 {
 		return nil, fmt.Errorf("input too small for ZSTD frame header")
 	}
@@ -161,10 +161,10 @@ func GetFrameInfo(src []byte) (*FrameInfo, error) {
 		// Extract frame header descriptor if available
 		if len(src) >= 6 {
 			frameHeaderDescriptor := src[4]
-			
+
 			// Bit 2: Checksum flag
 			info.HasChecksum = (frameHeaderDescriptor & 0x04) != 0
-			
+
 			// Dictionary ID is more complex to extract, would need full parsing
 			// For now, set to 0 (most common case)
 			info.DictionaryID = 0
@@ -192,7 +192,7 @@ func ValidateFrameHeader(src []byte) error {
 	if len(src) == 0 {
 		return fmt.Errorf("empty input")
 	}
-	
+
 	if len(src) < 4 {
 		return fmt.Errorf("input too small: need at least 4 bytes for magic number, got %d", len(src))
 	}

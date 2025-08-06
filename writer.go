@@ -65,8 +65,8 @@ type Writer struct {
 	compressionLevel int
 	wlog             int
 	nbWorkers        int
-	jobSize          int  // Track job size parameter
-	overlapLog       int  // Track overlap log parameter
+	jobSize          int // Track job size parameter
+	overlapLog       int // Track overlap log parameter
 	cs               *C.ZSTD_CStream
 	cd               *CDict
 

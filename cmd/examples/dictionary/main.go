@@ -49,9 +49,9 @@ func main() {
 	// Compress without dictionary for comparison
 	compressedWithoutDict := gozstd.Compress(nil, testData)
 	fmt.Printf("Compressed without dictionary: %d bytes\n", len(compressedWithoutDict))
-	
+
 	savings := len(compressedWithoutDict) - len(compressedWithDict)
-	fmt.Printf("Dictionary savings: %d bytes (%.1f%%)\n\n", 
+	fmt.Printf("Dictionary savings: %d bytes (%.1f%%)\n\n",
 		savings, float64(savings)/float64(len(compressedWithoutDict))*100)
 
 	// Decompress with dictionary
@@ -71,7 +71,7 @@ func main() {
 
 	// Demonstrate memory-efficient ByRef dictionary
 	fmt.Println("\n--- Using ByRef Dictionary (memory-efficient) ---")
-	
+
 	cdByRef, err := gozstd.NewCDictByRef(dict)
 	if err != nil {
 		log.Fatalf("Failed to create ByRef compression dictionary: %v", err)

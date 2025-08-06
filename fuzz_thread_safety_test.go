@@ -36,14 +36,14 @@ func FuzzDictionaryRaceConditions(f *testing.F) {
 		// Create multiple dictionaries
 		cdicts := make([]*CDict, numDicts)
 		ddicts := make([]*DDict, numDicts)
-		
+
 		for i := 0; i < numDicts; i++ {
 			var err error
 			cdicts[i], err = NewCDict(dictData)
 			if err != nil {
 				t.Fatalf("Cannot create CDict %d: %v", i, err)
 			}
-			
+
 			ddicts[i], err = NewDDict(dictData)
 			if err != nil {
 				t.Fatalf("Cannot create DDict %d: %v", i, err)
@@ -59,42 +59,42 @@ func FuzzDictionaryRaceConditions(f *testing.F) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				
+
 				dictIdx := idx % numDicts
 				cdict := cdicts[dictIdx]
 				ddict := ddicts[dictIdx]
-				
+
 				// Randomly release and re-acquire dictionaries to trigger ABA scenarios
 				if idx%5 == 0 && dictIdx > 0 {
 					// Release a dictionary in some goroutines
 					cdicts[dictIdx-1].Release()
 					ddicts[dictIdx-1].Release()
 				}
-				
+
 				// Try to use the dictionary
 				var compressed bytes.Buffer
 				writer := NewWriterDict(&compressed, cdict)
-				
+
 				if _, err := writer.Write(data); err != nil {
 					atomic.AddInt64(&errorCount, 1)
 					writer.Release()
 					return
 				}
-				
+
 				if err := writer.Close(); err != nil {
 					atomic.AddInt64(&errorCount, 1)
 					writer.Release()
 					return
 				}
 				writer.Release()
-				
+
 				// Try to decompress
 				_, err := DecompressDict(nil, compressed.Bytes(), ddict)
 				if err != nil {
 					atomic.AddInt64(&errorCount, 1)
 					return
 				}
-				
+
 				atomic.AddInt64(&successCount, 1)
 			}(i)
 		}
@@ -331,10 +331,10 @@ func TestExtremeParameterCombinations(t *testing.T) {
 	data := bytes.Repeat([]byte("extreme test "), 1000)
 
 	extremeCases := []WriterParams{
-		{CompressionLevel: 1, NbWorkers: 1, JobSize: 1024, OverlapLog: 0},           // Minimum values
-		{CompressionLevel: 22, NbWorkers: 16, JobSize: 1024*1024, OverlapLog: 9},    // Maximum values
-		{CompressionLevel: 3, NbWorkers: 8, JobSize: 0, OverlapLog: 0},              // Auto job size
-		{CompressionLevel: 1, NbWorkers: 1, JobSize: 512*1024*1024, OverlapLog: 5},  // Very large job size
+		{CompressionLevel: 1, NbWorkers: 1, JobSize: 1024, OverlapLog: 0},              // Minimum values
+		{CompressionLevel: 22, NbWorkers: 16, JobSize: 1024 * 1024, OverlapLog: 9},     // Maximum values
+		{CompressionLevel: 3, NbWorkers: 8, JobSize: 0, OverlapLog: 0},                 // Auto job size
+		{CompressionLevel: 1, NbWorkers: 1, JobSize: 512 * 1024 * 1024, OverlapLog: 5}, // Very large job size
 	}
 
 	for i, params := range extremeCases {

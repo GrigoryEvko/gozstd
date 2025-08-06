@@ -1,3 +1,4 @@
+//go:build darwin && arm64 && !ios
 // +build darwin,arm64,!ios
 
 package gozstd

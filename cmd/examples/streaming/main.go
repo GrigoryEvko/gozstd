@@ -26,7 +26,7 @@ func main() {
 			end = len(data)
 		}
 		chunk := data[i:end]
-		
+
 		n, err := writer.Write(chunk)
 		if err != nil {
 			log.Fatalf("Write failed: %v", err)

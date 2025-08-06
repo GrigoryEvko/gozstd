@@ -14,36 +14,36 @@ func FuzzBitFlipping(f *testing.F) {
 		CompressLevel(nil, []byte("with levels"), 19),
 		CompressLevel(nil, bytes.Repeat([]byte("repeated "), 100), 1),
 	}
-	
+
 	for _, compressed := range validCompressed {
 		for i := 0; i < len(compressed) && i < 20; i++ {
 			f.Add(compressed, i, uint8(1<<3)) // Flip different bits
 		}
 	}
-	
+
 	f.Fuzz(func(t *testing.T, compressed []byte, position int, bitMask uint8) {
 		if len(compressed) == 0 {
 			return
 		}
-		
+
 		// Make a copy to corrupt
 		corrupted := make([]byte, len(compressed))
 		copy(corrupted, compressed)
-		
+
 		// Flip bits at position
 		if position >= 0 && position < len(corrupted) {
 			corrupted[position] ^= bitMask
 		}
-		
+
 		// Try to decompress
 		result, err := Decompress(nil, corrupted)
-		
+
 		if err == nil {
 			// Some corruption may result in valid but different data
 			// This is acceptable ZSTD behavior - not all corruption is detectable
 			t.Logf("Corruption resulted in valid but different data: %d -> %d bytes",
 				len(compressed), len(result))
-			
+
 			// Only flag extreme expansions as potentially problematic
 			if len(result) > 100*len(compressed) {
 				t.Errorf("Decompressed corrupted data expanded excessively: %d -> %d bytes",
@@ -53,14 +53,14 @@ func FuzzBitFlipping(f *testing.F) {
 			// Expected - corruption should usually cause errors
 			t.Logf("Expected error on corrupted data: %v", err)
 		}
-		
+
 		// Test multiple bit flips
 		for i := 0; i < 8; i++ {
 			if position+i < len(corrupted) {
 				corrupted[position+i] ^= (1 << (i % 8))
 			}
 		}
-		
+
 		// Multiple bit flips increase likelihood of detection but don't guarantee it
 		_, err = Decompress(nil, corrupted)
 		if err == nil {
@@ -77,17 +77,17 @@ func FuzzBitFlipping(f *testing.F) {
 func FuzzTruncation(f *testing.F) {
 	data := []byte("This is test data for truncation fuzzing")
 	compressed := Compress(nil, data)
-	
+
 	// Test truncating at various positions
 	for i := 0; i <= len(compressed); i += len(compressed) / 10 {
 		f.Add(compressed, i)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, compressed []byte, truncateAt int) {
 		if len(compressed) == 0 {
 			return
 		}
-		
+
 		// Truncate at position
 		if truncateAt < 0 {
 			truncateAt = 0
@@ -95,12 +95,12 @@ func FuzzTruncation(f *testing.F) {
 		if truncateAt > len(compressed) {
 			truncateAt = len(compressed)
 		}
-		
+
 		truncated := compressed[:truncateAt]
-		
+
 		// Try to decompress truncated data
 		result, err := Decompress(nil, truncated)
-		
+
 		if truncateAt == 0 {
 			// 0-byte input is special case that succeeds in ZSTD
 			if err != nil {
@@ -116,7 +116,7 @@ func FuzzTruncation(f *testing.F) {
 			if err == nil {
 				t.Logf("Decompression succeeded with %d/%d bytes, result: %d bytes",
 					truncateAt, len(compressed), len(result))
-				
+
 				// Verify the partial result is reasonable
 				if len(result) > 100*len(compressed) {
 					t.Error("Truncated decompression produced unreasonable output")
@@ -128,7 +128,7 @@ func FuzzTruncation(f *testing.F) {
 				t.Errorf("Full decompression failed: %v", err)
 			}
 		}
-		
+
 		// Test progressive truncation
 		for i := len(compressed); i > 0; i-- {
 			_, err := Decompress(nil, compressed[:i])
@@ -160,26 +160,26 @@ func FuzzHeaderCorruption(f *testing.F) {
 			return result
 		}(),
 	}
-	
+
 	for _, frame := range frames {
 		f.Add(frame, 0, uint32(0x12345678))
 		f.Add(frame, 4, uint32(0xFFFFFFFF))
 	}
-	
+
 	f.Fuzz(func(t *testing.T, compressed []byte, offset int, corruptValue uint32) {
 		if len(compressed) < 8 {
 			return
 		}
-		
+
 		corrupted := make([]byte, len(compressed))
 		copy(corrupted, compressed)
-		
+
 		// ZSTD frame format:
 		// - Magic Number (4 bytes): 0xFD2FB528
 		// - Frame Header (2-14 bytes)
 		// - Data Blocks
 		// - Optional Checksum (4 bytes)
-		
+
 		// Corrupt magic number
 		if offset == 0 {
 			binary.LittleEndian.PutUint32(corrupted[0:4], corruptValue)
@@ -189,21 +189,21 @@ func FuzzHeaderCorruption(f *testing.F) {
 			}
 			return
 		}
-		
+
 		// Corrupt frame header descriptor
 		if offset == 4 && len(corrupted) > 4 {
 			corrupted[4] = byte(corruptValue)
-			
+
 			// Extract frame header descriptor bits
 			fhd := corrupted[4]
 			frameContentSizeFlag := (fhd >> 6) & 0x3
 			singleSegmentFlag := (fhd >> 5) & 0x1
 			checksumFlag := (fhd >> 2) & 0x1
 			dictIDFlag := fhd & 0x3
-			
+
 			t.Logf("Corrupted FHD: FCSFlag=%d, SingleSeg=%d, Checksum=%d, DictID=%d",
 				frameContentSizeFlag, singleSegmentFlag, checksumFlag, dictIDFlag)
-			
+
 			_, err := Decompress(nil, corrupted)
 			if err != nil {
 				t.Logf("Expected error with corrupted frame header: %v", err)
@@ -211,20 +211,20 @@ func FuzzHeaderCorruption(f *testing.F) {
 				t.Log("Decompression succeeded despite corrupted frame header")
 			}
 		}
-		
+
 		// Corrupt size fields
 		if offset > 4 && offset < len(corrupted)-4 {
 			// Inject large size value
 			if offset+4 <= len(corrupted) {
 				binary.LittleEndian.PutUint32(corrupted[offset:offset+4], corruptValue)
 			}
-			
+
 			_, err := Decompress(nil, corrupted)
 			if err != nil {
 				t.Logf("Expected error with corrupted size field: %v", err)
 			}
 		}
-		
+
 		// Corrupt checksum (last 4 bytes if present)
 		if len(corrupted) >= 8 {
 			copy(corrupted[len(corrupted)-4:], []byte{0xFF, 0xFF, 0xFF, 0xFF})
@@ -238,40 +238,40 @@ func FuzzHeaderCorruption(f *testing.F) {
 // FuzzDictionaryMismatch tests compression/decompression with wrong dictionaries
 func FuzzDictionaryMismatch(f *testing.F) {
 	f.Add([]byte("data"), []byte("dict1"), []byte("dict2"), 3)
-	
+
 	f.Fuzz(func(t *testing.T, data, dict1, dict2 []byte, level int) {
 		if len(dict1) == 0 || len(dict2) == 0 || len(dict1) > 1<<20 || len(dict2) > 1<<20 {
 			return
 		}
-		
+
 		// Create two different dictionaries
 		cd1, err := NewCDictLevel(dict1, level)
 		if err != nil {
 			return
 		}
 		defer cd1.Release()
-		
+
 		cd2, err := NewCDictLevel(dict2, level)
 		if err != nil {
 			return
 		}
 		defer cd2.Release()
-		
+
 		dd1, err := NewDDict(dict1)
 		if err != nil {
 			return
 		}
 		defer dd1.Release()
-		
+
 		dd2, err := NewDDict(dict2)
 		if err != nil {
 			return
 		}
 		defer dd2.Release()
-		
+
 		// Compress with dict1
 		compressed := CompressDict(nil, data, cd1)
-		
+
 		// Try to decompress with dict2 (wrong dictionary)
 		result, err := DecompressDict(nil, compressed, dd2)
 		if err == nil {
@@ -286,7 +286,7 @@ func FuzzDictionaryMismatch(f *testing.F) {
 			// Expected error when dictionaries truly mismatch
 			t.Logf("Expected error with dictionary mismatch: %v", err)
 		}
-		
+
 		// Try to decompress without any dictionary
 		// According to ZSTD: only fails if frame specifies dictionary ID
 		_, err = Decompress(nil, compressed)
@@ -295,7 +295,7 @@ func FuzzDictionaryMismatch(f *testing.F) {
 		} else {
 			t.Logf("Decompression without dictionary failed as expected: %v", err)
 		}
-		
+
 		// Compress without dict, decompress with dict
 		compressedNoDict := Compress(nil, data)
 		result, err = DecompressDict(nil, compressedNoDict, dd1)
@@ -310,18 +310,18 @@ func FuzzDictionaryMismatch(f *testing.F) {
 // FuzzMixedStreams tests concatenated/mixed compressed streams
 func FuzzMixedStreams(f *testing.F) {
 	f.Add([]byte("first"), []byte("second"), []byte("third"), 3, 5, 9)
-	
-	f.Fuzz(func(t *testing.T, data1, data2, data3 []byte, 
+
+	f.Fuzz(func(t *testing.T, data1, data2, data3 []byte,
 		level1, level2, level3 int) {
-		
+
 		// Create different compressions
 		comp1 := CompressLevel(nil, data1, level1)
 		comp2 := CompressLevel(nil, data2, level2)
 		comp3 := CompressLevel(nil, data3, level3)
-		
+
 		// Test concatenated streams
 		concatenated := append(append(comp1, comp2...), comp3...)
-		
+
 		// Try to decompress concatenated data
 		// ZSTD might only decompress the first frame
 		result, err := Decompress(nil, concatenated)
@@ -337,38 +337,38 @@ func FuzzMixedStreams(f *testing.F) {
 				t.Error("Unexpected result from concatenated streams")
 			}
 		}
-		
+
 		// Test mixed partial streams
 		if len(comp1) > 10 && len(comp2) > 10 {
 			// Take first half of comp1 and second half of comp2
 			mixed := append(comp1[:len(comp1)/2], comp2[len(comp2)/2:]...)
-			
+
 			_, err := Decompress(nil, mixed)
 			if err == nil {
 				t.Error("Decompression of mixed partial streams should have failed")
 			}
 		}
-		
+
 		// Test interleaved bytes
 		maxLen := len(comp1)
 		if len(comp2) < maxLen {
 			maxLen = len(comp2)
 		}
-		
+
 		interleaved := make([]byte, 0, maxLen*2)
 		for i := 0; i < maxLen; i++ {
 			interleaved = append(interleaved, comp1[i], comp2[i])
 		}
-		
+
 		_, err = Decompress(nil, interleaved)
 		if err == nil {
 			t.Error("Decompression of interleaved streams should have failed")
 		}
-		
+
 		// Test with garbage between valid frames
 		garbage := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00}
 		mixed := append(append(comp1, garbage...), comp2...)
-		
+
 		_, err = Decompress(nil, mixed)
 		if err == nil {
 			t.Log("Decompression succeeded despite garbage between frames")
@@ -379,7 +379,7 @@ func FuzzMixedStreams(f *testing.F) {
 // FuzzSizeFieldTampering tests modifying encoded sizes
 func FuzzSizeFieldTampering(f *testing.F) {
 	f.Add([]byte("test data for size tampering"), 100, 1000000)
-	
+
 	f.Fuzz(func(t *testing.T, data []byte, fakeSize1, fakeSize2 int) {
 		// Create frame with content size
 		ctx := NewCCtx()
@@ -388,42 +388,42 @@ func FuzzSizeFieldTampering(f *testing.F) {
 		if err != nil {
 			return
 		}
-		
+
 		// Try to find and modify size fields
 		corrupted := make([]byte, len(compressed))
 		copy(corrupted, compressed)
-		
+
 		// Look for potential size fields after frame header
 		// This is a bit hacky but we're fuzzing...
 		for i := 5; i < len(corrupted)-8; i++ {
 			// Look for values that might be sizes
-			val := binary.LittleEndian.Uint64(corrupted[i:i+8])
+			val := binary.LittleEndian.Uint64(corrupted[i : i+8])
 			if val == uint64(len(data)) {
 				// Found content size - corrupt it
 				binary.LittleEndian.PutUint64(corrupted[i:i+8], uint64(fakeSize1))
-				
+
 				_, err := Decompress(nil, corrupted)
 				if err != nil {
 					t.Logf("Expected error with tampered content size: %v", err)
 				} else {
 					t.Log("Decompression succeeded despite tampered content size")
 				}
-				
+
 				// Restore and try different value
 				binary.LittleEndian.PutUint64(corrupted[i:i+8], uint64(fakeSize2))
 				_, err = Decompress(nil, corrupted)
 				if err == nil && fakeSize2 != len(data) {
 					t.Error("Decompression succeeded with wrong content size")
 				}
-				
+
 				break
 			}
 		}
-		
+
 		// Test with pledged size mismatch
 		ctx.Reset(ZSTD_reset_session_only)
 		ctx.SetPledgedSrcSize(uint64(fakeSize1))
-		
+
 		// This might fail during compression
 		compressed2, err := ctx.Compress(nil, data)
 		if err != nil {

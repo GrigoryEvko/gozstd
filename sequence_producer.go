@@ -19,25 +19,26 @@
 // - Thread safety requirements for sequence producers
 //
 // BASIC USAGE:
-//   // Create compression context
-//   ctx := NewCCtx()
-//   defer ctx.Release()
-//   
-//   // Register custom sequence producer
-//   err := ctx.RegisterSequenceProducer(mySequenceProducer)
-//   if err != nil {
-//       log.Fatal(err)
-//   }
-//   
-//   // Enable safety features (recommended for development)
-//   ctx.SetSequenceValidation(true)
-//   ctx.SetSequenceProducerFallback(true)
-//   
-//   // Compress data using custom producer
-//   compressed, err := ctx.Compress(nil, data)
-//   if err != nil {
-//       log.Fatal(err)
-//   }
+//
+//	// Create compression context
+//	ctx := NewCCtx()
+//	defer ctx.Release()
+//
+//	// Register custom sequence producer
+//	err := ctx.RegisterSequenceProducer(mySequenceProducer)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	// Enable safety features (recommended for development)
+//	ctx.SetSequenceValidation(true)
+//	ctx.SetSequenceProducerFallback(true)
+//
+//	// Compress data using custom producer
+//	compressed, err := ctx.Compress(nil, data)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // PERFORMANCE CONSIDERATIONS:
 // External sequence producers add overhead compared to ZSTD's optimized internal
@@ -71,8 +72,8 @@ static size_t ZSTD_sequenceBound_wrapper(size_t srcSize) {
 static size_t ZSTD_compressSequences_wrapper(void *cctx, void *dst, size_t dstCapacity,
                                               void *inSeqs, size_t inSeqsSize,
                                               const void *src, size_t srcSize) {
-    return ZSTD_compressSequences((ZSTD_CCtx*)cctx, dst, dstCapacity, 
-                                  (const ZSTD_Sequence*)inSeqs, inSeqsSize, 
+    return ZSTD_compressSequences((ZSTD_CCtx*)cctx, dst, dstCapacity,
+                                  (const ZSTD_Sequence*)inSeqs, inSeqsSize,
                                   src, srcSize);
 }
 
@@ -121,14 +122,14 @@ import (
 func init() {
 	// Verify ZSTD_Sequence structure size matches between Go and C
 	if unsafe.Sizeof(ZSTD_Sequence{}) != unsafe.Sizeof(C.ZSTD_Sequence_C{}) {
-		panic(fmt.Sprintf("ZSTD_Sequence size mismatch: Go=%d bytes, C=%d bytes", 
+		panic(fmt.Sprintf("ZSTD_Sequence size mismatch: Go=%d bytes, C=%d bytes",
 			unsafe.Sizeof(ZSTD_Sequence{}), unsafe.Sizeof(C.ZSTD_Sequence_C{})))
 	}
-	
+
 	// Verify field alignment is correct
 	goSeq := ZSTD_Sequence{}
 	cSeq := C.ZSTD_Sequence_C{}
-	
+
 	if unsafe.Offsetof(goSeq.Offset) != uintptr(unsafe.Offsetof(cSeq.offset)) ||
 		unsafe.Offsetof(goSeq.LitLength) != uintptr(unsafe.Offsetof(cSeq.litLength)) ||
 		unsafe.Offsetof(goSeq.MatchLength) != uintptr(unsafe.Offsetof(cSeq.matchLength)) ||
@@ -156,25 +157,25 @@ func init() {
 type ZSTD_Sequence struct {
 	// Offset: The offset of the match (NOT the same as the offset code)
 	// - If offset == 0 and matchLength == 0: this sequence represents literals only
-	// - If offset > 0: distance to the start of the match in the sliding window  
+	// - If offset > 0: distance to the start of the match in the sliding window
 	// - Must be <= windowSize when used as a match
 	// - For block delimiters: offset == 0, matchLength == 0, litLength == 0
 	Offset uint32
-	
+
 	// LitLength: Number of literal bytes that precede the match
 	// - For literal-only sequences: total number of literal bytes
 	// - For matches: number of literals before the match starts
 	// - Total sequence length = litLength + matchLength
 	// - Range: [0, UINT32_MAX] but practical limit depends on block size
 	LitLength uint32
-	
+
 	// MatchLength: Length of the match in bytes
 	// - 0 for literal-only sequences
 	// - >= 3 for actual matches (ZSTD minimum match length)
 	// - For final sequence in block: can be 0 even with offset != 0
 	// - Range: [0, UINT32_MAX] but limited by remaining block data
 	MatchLength uint32
-	
+
 	// Rep: Repeat offset indicator for advanced compression
 	// - 0: 'offset' field contains the actual match offset
 	// - 1-3: References to repeat offset history (advanced feature)
@@ -214,7 +215,7 @@ const SequenceProducerError = ^uintptr(0)
 //
 // PERFORMANCE CONSIDERATIONS:
 // - External sequence producers add overhead vs ZSTD's internal algorithms
-// - Simple literal-only producers may be slower than ZSTD's fast modes  
+// - Simple literal-only producers may be slower than ZSTD's fast modes
 // - Complex analysis can improve compression ratio for specific data types
 // - Consider caching or pre-computed analysis for repeated patterns
 //
@@ -224,23 +225,24 @@ const SequenceProducerError = ^uintptr(0)
 // - Returning empty sequences with non-empty src is considered an error
 //
 // EXAMPLE USAGE:
-//   func MySequenceProducer(src []byte, dict []byte, level int, windowSize uint64) ([]ZSTD_Sequence, error) {
-//       if len(src) == 0 {
-//           return nil, fmt.Errorf("empty source data")
-//       }
-//       
-//       // Generate sequences that cover all bytes in src
-//       sequences := []ZSTD_Sequence{
-//           {Offset: 0, LitLength: uint32(len(src)), MatchLength: 0, Rep: 0},
-//       }
-//       
-//       return sequences, nil
-//   }
+//
+//	func MySequenceProducer(src []byte, dict []byte, level int, windowSize uint64) ([]ZSTD_Sequence, error) {
+//	    if len(src) == 0 {
+//	        return nil, fmt.Errorf("empty source data")
+//	    }
+//
+//	    // Generate sequences that cover all bytes in src
+//	    sequences := []ZSTD_Sequence{
+//	        {Offset: 0, LitLength: uint32(len(src)), MatchLength: 0, Rep: 0},
+//	    }
+//
+//	    return sequences, nil
+//	}
 type SequenceProducer func(
-	src []byte,           // Input data block to analyze
-	dict []byte,          // History buffer (currently always empty)
+	src []byte, // Input data block to analyze
+	dict []byte, // History buffer (currently always empty)
 	compressionLevel int, // Compression level hint (1-22)
-	windowSize uint64,    // Maximum allowed match offset
+	windowSize uint64, // Maximum allowed match offset
 ) ([]ZSTD_Sequence, error)
 
 // sequenceProducerRegistry manages registered sequence producers
@@ -259,7 +261,7 @@ var globalSequenceProducerRegistry = &sequenceProducerRegistry{
 func (r *sequenceProducerRegistry) register(producer SequenceProducer) uintptr {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	
+
 	handle := r.counter
 	r.counter++
 	r.producers[handle] = producer
@@ -287,34 +289,34 @@ func goSequenceProducerCallback(handle C.size_t,
 	src unsafe.Pointer, srcSize C.size_t,
 	dict unsafe.Pointer, dictSize C.size_t,
 	compressionLevel C.int, windowSize C.size_t) C.size_t {
-	
+
 	producer, exists := globalSequenceProducerRegistry.get(uintptr(handle))
 	if !exists {
 		return C.size_t(SequenceProducerError)
 	}
-	
+
 	// Convert C parameters to Go
 	var srcSlice []byte
 	if srcSize > 0 {
 		srcSlice = (*[1 << 30]byte)(src)[:srcSize:srcSize]
 	}
-	
+
 	var dictSlice []byte
 	if dictSize > 0 {
 		dictSlice = (*[1 << 30]byte)(dict)[:dictSize:dictSize]
 	}
-	
+
 	// Call the Go sequence producer
 	sequences, err := producer(srcSlice, dictSlice, int(compressionLevel), uint64(windowSize))
 	if err != nil {
 		return C.size_t(SequenceProducerError)
 	}
-	
+
 	// Check capacity
 	if uintptr(len(sequences)) > uintptr(outSeqsCapacity) {
 		return C.size_t(SequenceProducerError)
 	}
-	
+
 	// Copy sequences to output buffer
 	if len(sequences) > 0 {
 		outSeqsSlice := (*[1 << 30]C.ZSTD_Sequence_C)(outSeqs)[:outSeqsCapacity:outSeqsCapacity]
@@ -325,7 +327,7 @@ func goSequenceProducerCallback(handle C.size_t,
 			outSeqsSlice[i].rep = C.uint(seq.Rep)
 		}
 	}
-	
+
 	return C.size_t(len(sequences))
 }
 
@@ -358,11 +360,12 @@ func goSequenceProducerCallback(handle C.size_t,
 // knowledge that can significantly improve compression ratio.
 //
 // EXAMPLE:
-//   err := ctx.RegisterSequenceProducer(myCustomProducer)
-//   if err != nil {
-//       return fmt.Errorf("failed to register sequence producer: %w", err)
-//   }
-//   defer ctx.ClearSequenceProducer() // Clean up when done
+//
+//	err := ctx.RegisterSequenceProducer(myCustomProducer)
+//	if err != nil {
+//	    return fmt.Errorf("failed to register sequence producer: %w", err)
+//	}
+//	defer ctx.ClearSequenceProducer() // Clean up when done
 //
 // COMPATIBILITY:
 // This setting persists until explicitly cleared or the compression context is reset.
@@ -371,19 +374,19 @@ func (cctx *CCtx) RegisterSequenceProducer(producer SequenceProducer) error {
 	if cctx == nil {
 		return fmt.Errorf("compression context is nil")
 	}
-	
+
 	if producer == nil {
 		// Clear the sequence producer
 		C.ZSTD_registerSequenceProducer_wrapper(unsafe.Pointer(cctx.cctx), 0)
 		return nil
 	}
-	
+
 	// Register the producer and get a handle
 	handle := globalSequenceProducerRegistry.register(producer)
-	
+
 	// Register with ZSTD
 	C.ZSTD_registerSequenceProducer_wrapper(unsafe.Pointer(cctx.cctx), C.size_t(handle))
-	
+
 	return nil
 }
 
@@ -484,9 +487,10 @@ func (cctx *CCtx) SetSequenceProducerFallback(enabled bool) error {
 // sequence. The actual number of sequences needed is typically much smaller.
 //
 // USAGE:
-//   bound := SequenceBound(len(sourceData))
-//   sequences := make([]ZSTD_Sequence, 0, bound)
-//   // Generate sequences up to 'bound' capacity
+//
+//	bound := SequenceBound(len(sourceData))
+//	sequences := make([]ZSTD_Sequence, 0, bound)
+//	// Generate sequences up to 'bound' capacity
 //
 // PARAMETERS:
 // - srcSize: Size of the source buffer in bytes
@@ -528,55 +532,56 @@ func SequenceBound(srcSize int) int {
 // - Error if compression fails or sequences are invalid
 //
 // EXAMPLE:
-//   sequences := []ZSTD_Sequence{
-//       {Offset: 0, LitLength: uint32(len(data)), MatchLength: 0, Rep: 0},
-//   }
-//   compressed, err := ctx.CompressSequences(nil, sequences, data)
+//
+//	sequences := []ZSTD_Sequence{
+//	    {Offset: 0, LitLength: uint32(len(data)), MatchLength: 0, Rep: 0},
+//	}
+//	compressed, err := ctx.CompressSequences(nil, sequences, data)
 func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src []byte) ([]byte, error) {
 	if cctx == nil {
 		return nil, fmt.Errorf("compression context is nil")
 	}
-	
+
 	if len(sequences) == 0 {
 		return nil, fmt.Errorf("sequences array is empty")
 	}
-	
+
 	dstLen := len(dst)
-	
+
 	// Calculate required capacity
 	compressBound := int(C.ZSTD_compressBound(C.size_t(len(src)))) + 1
 	requiredTotal := dstLen + compressBound
-	
+
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
 		copy(newBuf, dst[:dstLen])
-		
+
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
 			PutBuffer(dst[:0])
 		}
-		
+
 		dst = newBuf[:dstLen]
 	}
-	
+
 	// Prepare sequence array for C
 	var seqPtr unsafe.Pointer
 	if len(sequences) > 0 {
 		seqPtr = unsafe.Pointer(&sequences[0])
 	}
-	
+
 	// Prepare source data
 	var srcPtr unsafe.Pointer
 	if len(src) > 0 {
 		srcHdr := (*reflect.SliceHeader)(unsafe.Pointer(&src))
 		srcPtr = unsafe.Pointer(srcHdr.Data)
 	}
-	
+
 	// Prepare destination buffer
 	dstHdr := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
 	dstPtr := unsafe.Pointer(uintptr(dstHdr.Data) + uintptr(dstLen))
-	
+
 	// Call ZSTD
 	result := C.ZSTD_compressSequences_wrapper(
 		unsafe.Pointer(cctx.cctx),
@@ -586,11 +591,11 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 		C.size_t(len(sequences)),
 		srcPtr,
 		C.size_t(len(src)))
-	
+
 	runtime.KeepAlive(dst)
 	runtime.KeepAlive(src)
 	runtime.KeepAlive(sequences)
-	
+
 	if C.ZSTD_isError(result) != 0 {
 		ctx := ErrorContext{
 			InputSize:  len(src),
@@ -598,13 +603,13 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 		}
 		return dst[:dstLen], mapZstdError(result, "sequence compression", ctx)
 	}
-	
+
 	compressedSize := int(result)
 	finalDst := dst[:dstLen+compressedSize]
-	
+
 	// Optimize buffer to reduce memory waste
 	finalDst = OptimizeBuffer(finalDst)
-	
+
 	return finalDst, nil
 }
 
@@ -637,13 +642,13 @@ func MergeBlockDelimiters(sequences []ZSTD_Sequence) []ZSTD_Sequence {
 	if len(sequences) == 0 {
 		return sequences
 	}
-	
+
 	// Call ZSTD to merge delimiters
 	seqPtr := unsafe.Pointer(&sequences[0])
 	resultSize := C.ZSTD_mergeBlockDelimiters_wrapper(seqPtr, C.size_t(len(sequences)))
-	
+
 	runtime.KeepAlive(sequences)
-	
+
 	// Return the truncated slice
 	return sequences[:resultSize]
 }
@@ -669,9 +674,9 @@ func MergeBlockDelimiters(sequences []ZSTD_Sequence) []ZSTD_Sequence {
 // Call this function to validate sequences before passing them to CompressSequences
 // or when debugging external sequence producers:
 //
-//   if err := ValidateSequences(sequences, len(sourceData)); err != nil {
-//       return fmt.Errorf("invalid sequences: %w", err)
-//   }
+//	if err := ValidateSequences(sequences, len(sourceData)); err != nil {
+//	    return fmt.Errorf("invalid sequences: %w", err)
+//	}
 //
 // PERFORMANCE:
 // This validation is independent of ZSTD's internal validation (ZSTD_c_validateSequences).
@@ -691,11 +696,11 @@ func ValidateSequences(sequences []ZSTD_Sequence, srcSize int) error {
 		}
 		return fmt.Errorf("no sequences provided for non-empty source")
 	}
-	
+
 	totalLength := 0
 	for i, seq := range sequences {
 		totalLength += int(seq.LitLength) + int(seq.MatchLength)
-		
+
 		// Check final sequence constraints
 		if i == len(sequences)-1 {
 			if seq.MatchLength == 0 && seq.Offset != 0 {
@@ -708,11 +713,11 @@ func ValidateSequences(sequences []ZSTD_Sequence, srcSize int) error {
 			}
 		}
 	}
-	
+
 	if totalLength != srcSize {
 		return fmt.Errorf("sequence lengths sum to %d but source size is %d", totalLength, srcSize)
 	}
-	
+
 	return nil
 }
 
@@ -752,7 +757,7 @@ func SimpleSequenceProducer(src []byte, dict []byte, compressionLevel int, windo
 	if len(src) == 0 {
 		return nil, fmt.Errorf("empty source data")
 	}
-	
+
 	// Generate a single sequence that treats all data as literals
 	sequences := []ZSTD_Sequence{
 		{
@@ -762,7 +767,7 @@ func SimpleSequenceProducer(src []byte, dict []byte, compressionLevel int, windo
 			Rep:         0,
 		},
 	}
-	
+
 	return sequences, nil
 }
 
@@ -806,7 +811,7 @@ func RepetitiveSequenceProducer(src []byte, dict []byte, compressionLevel int, w
 	if len(src) == 0 {
 		return nil, fmt.Errorf("empty source data")
 	}
-	
+
 	// For now, just use the simple producer to ensure correctness
 	// Real pattern detection is complex and error-prone
 	return SimpleSequenceProducer(src, dict, compressionLevel, windowSize)
