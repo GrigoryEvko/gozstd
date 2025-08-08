@@ -2,7 +2,7 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 GOOS_GOARCH := $(GOOS)_$(GOARCH)
 GOOS_GOARCH_NATIVE := $(shell go env GOHOSTOS)_$(shell go env GOHOSTARCH)
-LIBZSTD_NAME := libzstd_$(GOOS_GOARCH).a
+LIBZSTD_NAME := cgo/lib/$(GOOS_GOARCH).a
 ZSTD_VERSION ?= v1.5.7-kernel
 ZIG_BUILDER_IMAGE := gozstd-zig-builder:latest
 
@@ -51,7 +51,7 @@ else ifeq ($(GOOS_GOARCH),linux_arm64)
 else ifeq ($(GOOS_GOARCH),linux_ppc64le)
 	TARGET=powerpc64le-linux GOARCH=ppc64le GOOS=linux ARCH_FLAGS="" $(MAKE) package-arch
 else ifeq ($(GOOS_GOARCH),linux_riscv64)
-	TARGET=riscv64-linux GOARCH=riscv64 GOOS=linux ARCH_FLAGS="-mcpu=generic" $(MAKE) package-arch
+	TARGET=riscv64-linux GOARCH=riscv64 GOOS=linux ARCH_FLAGS="-mcpu=generic_rv64" $(MAKE) package-arch
 else ifeq ($(GOOS_GOARCH),linux_musl_amd64)
 	TARGET=x86_64-linux-musl GOARCH=amd64 GOOS=linux_musl ARCH_FLAGS="-mcpu=x86_64+sse4_2+avx2+bmi2" $(MAKE) package-arch
 else ifeq ($(GOOS_GOARCH),linux_musl_arm64)
@@ -80,7 +80,7 @@ endif
 			else \
 				LTO_FLAG="-flto"; \
 			fi; \
-			rm -f ./*.o ./*.a ./*.gcda ./*.so ./*.so.* libzstd.pc ./-.o 2>/dev/null || true; \
+			rm -f ./*.o ./*.a ./*.gcda ./*.so ./*.so.* libzstd.pc 2>/dev/null || true; \
 			rm -rf obj/* dll/*.dll dll/*.lib libzstd-nomt* *.dSYM 2>/dev/null || true; \
 			ZSTD_LEGACY_SUPPORT=0 AR="zig ar" \
 			CC="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \

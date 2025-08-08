@@ -579,8 +579,10 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 	}
 
 	// Prepare destination buffer
-	dstHdr := (*reflect.SliceHeader)(unsafe.Pointer(&dst))
-	dstPtr := unsafe.Pointer(uintptr(dstHdr.Data) + uintptr(dstLen))
+	var dstPtr unsafe.Pointer
+	if cap(dst) > dstLen {
+		dstPtr = unsafe.Pointer(&dst[dstLen])
+	}
 
 	// Call ZSTD
 	result := C.ZSTD_compressSequences_wrapper(

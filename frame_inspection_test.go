@@ -280,8 +280,6 @@ func TestFrameInspectionPerformance(t *testing.T) {
 			}
 
 			// Test frame inspection performance
-			start := testing.B{} // Approximate timing
-
 			contentSize, err := GetFrameContentSize(compressed)
 			if err != nil {
 				t.Fatalf("GetFrameContentSize failed: %v", err)
@@ -296,8 +294,6 @@ func TestFrameInspectionPerformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetFrameInfo failed: %v", err)
 			}
-
-			_ = start // Avoid unused variable
 
 			// Verify results
 			if contentSize != uint64(size) {

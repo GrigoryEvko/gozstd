@@ -260,7 +260,7 @@ libzstd-nomt: $(ZSTD_NOMT_FILES)
 .PHONY: clean
 clean:
 	$(RM) -r *.dSYM   # macOS-specific
-	$(RM) core *.o *.a *.gcda *.$(SHARED_EXT) *.$(SHARED_EXT).* libzstd.pc
+	$(RM) core ./*.o ./*.a *.gcda *.$(SHARED_EXT) *.$(SHARED_EXT).* libzstd.pc
 	$(RM) dll/libzstd.dll dll/libzstd.lib libzstd-nomt*
 	$(RM) -r obj/*
 	@echo Cleaning library completed
