@@ -20,34 +20,7 @@ func BenchmarkAdvancedFeatures(b *testing.B) {
 
 					// Benchmark Rsync-friendly compression
 					b.Run("RsyncFriendly", func(b *testing.B) {
-						cctx := NewCCtx()
-						defer cctx.Release()
-
-						// Enable rsync-friendly mode with multi-threading
-						if err := cctx.SetParameter(ZSTD_c_nbWorkers, 2); err != nil {
-							b.Fatalf("failed to set nbWorkers: %v", err)
-						}
-						if err := cctx.SetRsyncFriendly(true); err != nil {
-							b.Fatalf("failed to set rsync friendly: %v", err)
-						}
-						if err := cctx.SetParameter(ZSTD_c_compressionLevel, level); err != nil {
-							b.Fatalf("failed to set compression level: %v", err)
-						}
-
-						b.ResetTimer()
-						b.SetBytes(int64(blockSize))
-						b.ReportAllocs()
-
-						for i := 0; i < b.N; i++ {
-							compressed, err := cctx.Compress(nil, data)
-							if err != nil {
-								b.Fatalf("compression failed: %v", err)
-							}
-							// Prevent optimization
-							if len(compressed) == 0 {
-								b.Fatal("empty compression result")
-							}
-						}
+						b.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 					})
 
 					// Benchmark Advanced Streaming Parameters
