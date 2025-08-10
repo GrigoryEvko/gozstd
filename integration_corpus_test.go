@@ -223,6 +223,7 @@ func TestCorpusAdvancedAPI(t *testing.T) {
 			// Test with checksum enabled
 			t.Run("with_checksum", func(t *testing.T) {
 				ctx := NewCCtx()
+				defer ctx.Release()
 
 				err := ctx.SetParameter(ZSTD_c_compressionLevel, 5)
 				if err != nil {
@@ -266,6 +267,7 @@ func TestCorpusAdvancedAPI(t *testing.T) {
 			for _, s := range strategies {
 				t.Run(fmt.Sprintf("strategy_%s", s.name), func(t *testing.T) {
 					ctx := NewCCtx()
+					defer ctx.Release()
 
 					ctx.SetParameter(ZSTD_c_compressionLevel, 3)
 					ctx.SetParameter(ZSTD_c_strategy, int(s.strategy))

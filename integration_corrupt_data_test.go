@@ -148,6 +148,7 @@ func FuzzHeaderCorruption(f *testing.F) {
 		Compress(nil, []byte("simple")),
 		func() []byte {
 			ctx := NewCCtx()
+			defer ctx.Release()
 			ctx.SetParameter(ZSTD_c_checksumFlag, 1)
 			ctx.SetParameter(ZSTD_c_contentSizeFlag, 1)
 			result, _ := ctx.Compress(nil, []byte("with flags"))
@@ -155,6 +156,7 @@ func FuzzHeaderCorruption(f *testing.F) {
 		}(),
 		func() []byte {
 			ctx := NewCCtx()
+			defer ctx.Release()
 			ctx.SetParameter(ZSTD_c_windowLog, 20)
 			result, _ := ctx.Compress(nil, bytes.Repeat([]byte("large "), 1000))
 			return result
@@ -383,6 +385,7 @@ func FuzzSizeFieldTampering(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, fakeSize1, fakeSize2 int) {
 		// Create frame with content size
 		ctx := NewCCtx()
+		defer ctx.Release()
 		ctx.SetParameter(ZSTD_c_contentSizeFlag, 1)
 		compressed, err := ctx.Compress(nil, data)
 		if err != nil {

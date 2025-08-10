@@ -18,6 +18,7 @@ func FuzzParameterBoundaries(f *testing.F) {
 		level, windowLog, hashLog, chainLog, searchLog, minMatch, targetLength, strategy int) {
 
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Test setting each parameter with the fuzzed value
 		params := []struct {
@@ -78,6 +79,7 @@ func FuzzConflictingParameters(f *testing.F) {
 		windowLog, ldmHashLog, enableLdm, hashLog, chainLog, nbWorkers, jobSize int) {
 
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Set potentially conflicting parameters
 
@@ -136,6 +138,7 @@ func FuzzAllParameterCombinations(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, paramBits uint64) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// All available parameters
 		allParams := []struct {
@@ -209,6 +212,7 @@ func FuzzParameterOverflow(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, param1, param2, multiplier int) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Test various overflow scenarios
 		testCases := []struct {
@@ -260,6 +264,7 @@ func FuzzMultiThreadingParameters(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, nbWorkers, jobSize int) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Test extreme nbWorkers values
 		// Note: Values significantly exceeding CPU count are now rejected for safety

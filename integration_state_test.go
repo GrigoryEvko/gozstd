@@ -15,6 +15,7 @@ func FuzzStateMachineReset(f *testing.F) {
 		param1, param2 int) { // Parameters to set
 
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Helper to get reset directive
 		getResetDirective := func(r int) ZSTD_ResetDirective {
@@ -119,6 +120,7 @@ func FuzzPledgedSizeLies(f *testing.F) {
 		}
 
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Set pledged size
 		err := ctx.SetPledgedSrcSize(uint64(pledged))
@@ -186,6 +188,7 @@ func FuzzContextReuse(f *testing.F) {
 		level1, level2, level3 int) {
 
 		ctx := NewCCtx()
+		defer ctx.Release()
 		var compressed [][]byte
 
 		// Use same context for multiple compressions with different settings
@@ -329,6 +332,7 @@ func FuzzRapidContextOperations(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, operations uint32) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Use operations bits to determine what to do
 		for i := 0; i < 32; i++ {

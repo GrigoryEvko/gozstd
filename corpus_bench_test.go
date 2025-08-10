@@ -114,6 +114,7 @@ func benchmarkWrapperCompression(b *testing.B, data []byte, level int) {
 
 func benchmarkAdvancedCompression(b *testing.B, data []byte, level int) {
 	ctx := NewCCtx()
+	defer ctx.Release()
 	err := ctx.SetParameter(ZSTD_c_compressionLevel, level)
 	if err != nil {
 		b.Fatalf("Failed to set compression level: %v", err)
@@ -264,6 +265,7 @@ func BenchmarkCorpusStrategies(b *testing.B) {
 			for _, s := range strategies {
 				b.Run(s.name, func(b *testing.B) {
 					ctx := NewCCtx()
+					defer ctx.Release()
 					ctx.SetParameter(ZSTD_c_compressionLevel, 3)
 					ctx.SetParameter(ZSTD_c_strategy, int(s.strategy))
 

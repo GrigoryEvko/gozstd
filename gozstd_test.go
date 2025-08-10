@@ -360,6 +360,7 @@ func TestCompressDecompressMultiFrames(t *testing.T) {
 
 func TestCCtxSetParams(t *testing.T) {
 	ctx := NewCCtx()
+	defer ctx.Release()
 	err := ctx.SetParameter(ZSTD_c_compressionLevel, 0)
 	if err != nil {
 		t.Fatalf("cannot set parameter: compressionLevel")
@@ -378,6 +379,7 @@ func TestCompress2(t *testing.T) {
 	origData := append([]byte{}, bb.Bytes()...)
 
 	ctx := NewCCtx()
+	defer ctx.Release()
 	err := ctx.SetParameter(ZSTD_c_compressionLevel, 0)
 	if err != nil {
 		t.Fatalf("cannot set parameter: compressionLevel")
@@ -511,6 +513,7 @@ func TestAdvancedAPIAllParameters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
+			defer ctx.Release()
 
 			// Apply all parameters
 			for param, value := range tt.parameters {
@@ -562,6 +565,7 @@ func TestAdvancedAPIStrategies(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			ctx := NewCCtx()
 
+			defer ctx.Release()
 			err := ctx.SetParameter(ZSTD_c_compressionLevel, 3)
 			if err != nil {
 				t.Fatalf("cannot set compression level: %s", err)
@@ -604,6 +608,7 @@ func TestAdvancedAPIReset(t *testing.T) {
 	for _, rd := range resetDirectives {
 		t.Run(rd.name, func(t *testing.T) {
 			ctx := NewCCtx()
+			defer ctx.Release()
 
 			// Set some parameters
 			ctx.SetParameter(ZSTD_c_compressionLevel, 5)
@@ -675,6 +680,7 @@ func TestAdvancedAPIPledgedSrcSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
+			defer ctx.Release()
 
 			err := ctx.SetPledgedSrcSize(tt.pledgedSize)
 			if err != nil {
@@ -736,6 +742,7 @@ func TestAdvancedAPIMultiThreading(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
+			defer ctx.Release()
 
 			// Set multi-threading parameters
 			err := ctx.SetParameter(ZSTD_c_nbWorkers, tt.nbWorkers)
@@ -811,6 +818,7 @@ func TestAdvancedAPIErrorCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewCCtx()
+			defer ctx.Release()
 
 			err := ctx.SetParameter(tt.param, tt.value)
 			if (err != nil) != tt.expectError {

@@ -67,6 +67,8 @@ type Writer struct {
 	nbWorkers        int
 	jobSize          int // Track job size parameter
 	overlapLog       int // Track overlap log parameter
+	closed           bool // Track if writer has been closed
+	released         bool // Track if resources have been released
 	cs               *C.ZSTD_CStream
 	cd               *CDict
 
@@ -295,16 +297,24 @@ func initCStream(cs *C.ZSTD_CStream, params WriterParams) {
 }
 
 func freeCStream(v interface{}) {
-	v.(*Writer).Release()
+	zw := v.(*Writer)
+	// Auto-close to flush any remaining data before releasing
+	if !zw.closed && zw.cs != nil {
+		// Attempt to close gracefully to flush data
+		// Ignore errors since we're in finalizer
+		_ = zw.Close()
+	}
+	zw.Release()
 }
 
 // Release releases all the resources occupied by zw.
 //
 // zw cannot be used after the release.
 func (zw *Writer) Release() {
-	if zw.cs == nil {
+	if zw.released || zw.cs == nil {
 		return
 	}
+	zw.released = true
 
 	result := C.ZSTD_freeCStream_wrapper(
 		C.uintptr_t(uintptr(unsafe.Pointer(zw.cs))))
@@ -456,7 +466,13 @@ func (zw *Writer) Flush() error {
 // to the underlying writer.
 //
 // It doesn't close the underlying writer passed to New* functions.
+// This method is safe to call multiple times.
 func (zw *Writer) Close() error {
+	if zw.closed {
+		return nil
+	}
+	zw.closed = true
+	
 	if err := zw.Flush(); err != nil {
 		return err
 	}

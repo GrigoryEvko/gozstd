@@ -181,6 +181,7 @@ func FuzzAdvancedAPI(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, level int, windowLog int, hashLog int,
 		checksumFlag int, strategy int) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Set compression level
 		if err := ctx.SetParameter(ZSTD_c_compressionLevel, level); err != nil {
@@ -316,6 +317,7 @@ func FuzzResetContext(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, level int, resetType int) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// First compression
 		ctx.SetParameter(ZSTD_c_compressionLevel, level)
@@ -364,6 +366,7 @@ func FuzzPledgedSize(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, pledgedSize uint64) {
 		ctx := NewCCtx()
+		defer ctx.Release()
 
 		// Set pledged size
 		if err := ctx.SetPledgedSrcSize(pledgedSize); err != nil {

@@ -117,26 +117,50 @@ type CCtx struct {
 	*cctxWrapper                     // Pointer to wrapper for proper pool lifecycle
 	paramsMutex   sync.RWMutex       // Protect concurrent access to currentParams
 	currentParams map[CParameter]int // Track parameters for validation
+	released      bool               // Track if context has been released to prevent double-release
 }
 
 // NewCCtx creates a new compression context.
-// The returned context must be released by calling Release() when no longer needed.
+// The context will be automatically released when garbage collected.
+// You can still call Release() explicitly for immediate cleanup.
 func NewCCtx() *CCtx {
 	cctxWrap := cctxPool.Get().(*cctxWrapper)
 	ctx := &CCtx{
 		cctxWrapper:   cctxWrap, // Store pointer, not value
 		currentParams: make(map[CParameter]int),
+		released:      false,
 	}
 	ctx.SetParameter(ZSTD_c_compressionLevel, 0)
+	
+	// Set finalizer for automatic cleanup
+	runtime.SetFinalizer(ctx, (*CCtx).finalizeRelease)
 	return ctx
 }
 
 // Release returns the compression context to the pool for reuse.
 // The context must not be used after calling Release().
+// This method is safe to call multiple times.
 func (ctx *CCtx) Release() {
-	if ctx == nil {
+	if ctx == nil || ctx.released {
 		return
 	}
+	
+	// Clear finalizer since we're manually releasing
+	runtime.SetFinalizer(ctx, nil)
+	ctx.releaseInternal()
+}
+
+// finalizeRelease is called by the garbage collector to automatically release the context
+func (ctx *CCtx) finalizeRelease() {
+	if !ctx.released {
+		ctx.releaseInternal()
+	}
+}
+
+// releaseInternal performs the actual release logic
+func (ctx *CCtx) releaseInternal() {
+	ctx.released = true
+	
 	// Reset the context to a clean state before returning to pool
 	ctx.Reset(ZSTD_reset_session_and_parameters)
 
