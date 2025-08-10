@@ -342,7 +342,7 @@ func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressi
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
-		
+
 		if dstLen > 0 {
 			// Only extend to what we need to copy
 			newBuf = newBuf[:dstLen]
@@ -401,7 +401,7 @@ func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
-		
+
 		if dstLen > 0 {
 			// Only extend to what we need to copy
 			newBuf = newBuf[:dstLen]
