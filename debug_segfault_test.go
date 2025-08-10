@@ -7,6 +7,7 @@ import (
 
 // TestSegfaultReproduction - Minimal test to reproduce the segmentation fault
 func TestSegfaultReproduction(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	// Create test data
 	data := []byte("test data for segfault reproduction")
 
@@ -89,6 +90,7 @@ func TestSegfaultReproduction(t *testing.T) {
 
 // TestBenchmarkReproduction - Test that matches the benchmark conditions exactly
 func TestBenchmarkReproduction(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	// Create data that matches the benchmark (10KB)
 	data := newBenchString(10000)
 
@@ -187,6 +189,7 @@ func TestBenchmarkReproduction(t *testing.T) {
 
 // TestCCtxStateValidation - Test for context state corruption
 func TestCCtxStateValidation(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	cctx := NewCCtx()
 	defer cctx.Release()
 

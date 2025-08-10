@@ -40,7 +40,7 @@ libzstd.a: $(LIBZSTD_NAME)
 $(LIBZSTD_NAME):
 ifeq ($(GOOS_GOARCH),$(GOOS_GOARCH_NATIVE))
 	rm -f $(LIBZSTD_NAME)
-	cd contrib/zstd/lib && ZSTD_LEGACY_SUPPORT=0 AR="gcc-ar" ARFLAGS="rcs" MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 -flto $(MOREFLAGS)" LDFLAGS="-flto -fuse-linker-plugin -Wno-lto-type-mismatch" $(MAKE) clean libzstd.a
+	cd contrib/zstd/lib && ZSTD_LEGACY_SUPPORT=0 MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 $(MOREFLAGS)" $(MAKE) clean libzstd.a
 	mv contrib/zstd/lib/libzstd.a $(LIBZSTD_NAME)
 else ifeq ($(GOOS_GOARCH),linux_amd64)
 	TARGET=x86_64-linux GOARCH=amd64 GOOS=linux ARCH_FLAGS="-mcpu=x86_64+sse4_2+avx2+bmi2" $(MAKE) package-arch
@@ -75,17 +75,12 @@ endif
 		-w /zstd/contrib/zstd/lib \
 		$(DOCKER_OPTS) \
 		$(ZIG_BUILDER_IMAGE) \
-		-c 'if echo "$(TARGET)" | grep -q "macos\|darwin"; then \
-				LTO_FLAG=""; \
-			else \
-				LTO_FLAG="-flto"; \
-			fi; \
-			rm -f ./*.o ./*.a ./*.gcda ./*.so ./*.so.* libzstd.pc 2>/dev/null || true; \
+		-c 'rm -f ./*.o ./*.a ./*.gcda ./*.so ./*.so.* libzstd.pc 2>/dev/null || true; \
 			rm -rf obj/* dll/*.dll dll/*.lib libzstd-nomt* *.dSYM 2>/dev/null || true; \
 			ZSTD_LEGACY_SUPPORT=0 AR="zig ar" \
-			CC="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
-			CXX="zig cc -target $(TARGET) -O3 $$LTO_FLAG $(ARCH_FLAGS)" \
-			MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 $$LTO_FLAG $(ARCH_FLAGS) $(MOREFLAGS)" \
+			CC="zig cc -target $(TARGET) -O3 $(ARCH_FLAGS)" \
+			CXX="zig cc -target $(TARGET) -O3 $(ARCH_FLAGS)" \
+			MOREFLAGS="-DZSTD_MULTITHREAD=1 -O3 $(ARCH_FLAGS) $(MOREFLAGS)" \
 			make -j$(JOBS) libzstd.a'
 	mv -f contrib/zstd/lib/libzstd.a $(LIBZSTD_NAME)
 
@@ -118,13 +113,13 @@ update-zstd:
 	$(MAKE) release
 
 test:
-	CGO_LDFLAGS_ALLOW='-flto.*' CGO_ENABLED=1 GOEXPERIMENT=cgocheck2 go test -ldflags="-linkmode=external" -v
+	CGO_ENABLED=1 GOEXPERIMENT=cgocheck2 go test -ldflags="-linkmode=external" -v
 
 test-no-lto:
 	CGO_ENABLED=1 GOEXPERIMENT=cgocheck2 go test -v
 
 bench:
-	CGO_LDFLAGS_ALLOW='-flto.*' CGO_ENABLED=1 go test -ldflags="-linkmode=external" -bench=.
+	CGO_ENABLED=1 go test -ldflags="-linkmode=external" -bench=.
 
 bench-no-lto:
 	CGO_ENABLED=1 go test -bench=.

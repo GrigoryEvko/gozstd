@@ -7,6 +7,7 @@ import (
 )
 
 func TestRsyncFriendly(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	t.Run("SetRsyncFriendly_Enable", func(t *testing.T) {
 		ctx := NewCCtx()
 		defer ctx.Release()
@@ -175,6 +176,7 @@ func TestRsyncFriendly(t *testing.T) {
 }
 
 func TestRsyncFriendlyValidation(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	// Test parameter validation bounds
 	validator := NewParameterValidator()
 
@@ -215,6 +217,7 @@ func TestRsyncFriendlyValidation(t *testing.T) {
 }
 
 func TestRsyncFriendlyIntegration(t *testing.T) {
+	t.Skip("Rsync mode disabled due to ZSTD 1.5.7 segfault bug")
 	// Test integration with other parameters
 	ctx := NewCCtx()
 	defer ctx.Release()

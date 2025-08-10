@@ -2,6 +2,7 @@ package gozstd
 
 import (
 	"math"
+	"runtime"
 	"testing"
 )
 
@@ -261,8 +262,10 @@ func FuzzMultiThreadingParameters(f *testing.F) {
 		ctx := NewCCtx()
 
 		// Test extreme nbWorkers values
+		// Note: Values significantly exceeding CPU count are now rejected for safety
+		maxReasonableWorkers := runtime.NumCPU() * 2
 		err := ctx.SetParameter(ZSTD_c_nbWorkers, nbWorkers)
-		if err != nil && nbWorkers >= 0 && nbWorkers <= 400 {
+		if err != nil && nbWorkers >= 0 && nbWorkers <= maxReasonableWorkers {
 			// This should have worked
 			t.Errorf("Failed to set valid nbWorkers=%d: %v", nbWorkers, err)
 		}

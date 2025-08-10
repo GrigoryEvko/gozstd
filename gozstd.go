@@ -342,7 +342,12 @@ func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressi
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
-		copy(newBuf, dst[:dstLen])
+		
+		if dstLen > 0 {
+			// Only extend to what we need to copy
+			newBuf = newBuf[:dstLen]
+			copy(newBuf, dst[:dstLen])
+		}
 
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
@@ -396,7 +401,12 @@ func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
-		copy(newBuf, dst[:dstLen])
+		
+		if dstLen > 0 {
+			// Only extend to what we need to copy
+			newBuf = newBuf[:dstLen]
+			copy(newBuf, dst[:dstLen])
+		}
 
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
@@ -593,6 +603,8 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetDecompressBuffer(requiredTotal)
+		// Extend newBuf to have enough length for the copy
+		newBuf = newBuf[:requiredTotal]
 		copy(newBuf, dst[:dstLen])
 
 		// Return old buffer to pool if it's from our pool system

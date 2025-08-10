@@ -555,14 +555,16 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 	if cap(dst) < requiredTotal {
 		// Use buffer pool for more efficient memory management
 		newBuf := GetBuffer(requiredTotal)
-		copy(newBuf, dst[:dstLen])
+		if dstLen > 0 && cap(dst) > 0 {
+			copy(newBuf, dst[:dstLen])
+		}
 
 		// Return old buffer to pool if it's from our pool system
 		if cap(dst) > 0 && len(dst) > 0 {
 			PutBuffer(dst[:0])
 		}
 
-		dst = newBuf[:dstLen]
+		dst = newBuf[:0]
 	}
 
 	// Prepare sequence array for C
@@ -580,8 +582,15 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 
 	// Prepare destination buffer
 	var dstPtr unsafe.Pointer
-	if cap(dst) > dstLen {
+	if cap(dst) > dstLen && len(dst) > dstLen {
 		dstPtr = unsafe.Pointer(&dst[dstLen])
+	} else if cap(dst) > dstLen {
+		// We have capacity but not enough length, extend the slice
+		dst = dst[:cap(dst)]
+		dstPtr = unsafe.Pointer(&dst[dstLen])
+	} else {
+		// No capacity or insufficient capacity - shouldn't happen after buffer allocation
+		dstPtr = nil
 	}
 
 	// Call ZSTD
