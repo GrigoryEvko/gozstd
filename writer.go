@@ -274,7 +274,8 @@ func initCStream(cs *C.ZSTD_CStream, params WriterParams) {
 
 	// Automatically use shared thread pool when multi-threading is enabled
 	if params.NbWorkers > 0 {
-		useThreadPool(cs)
+		// TODO: Implement thread pool usage
+		// useThreadPool(cs)
 	}
 
 	// Set job size for multi-threaded compression (if specified)

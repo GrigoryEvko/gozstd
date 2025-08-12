@@ -47,8 +47,36 @@ import (
 	"unsafe"
 )
 
-// DefaultCompressionLevel is the default compression level.
-const DefaultCompressionLevel = 3 // Obtained from ZSTD_CLEVEL_DEFAULT.
+// Compression level constants
+const (
+	MinCompressionLevel = -131072 // Minimum compression level (fast negative levels)
+	MaxCompressionLevel = 22      // Maximum compression level
+	DefaultCompressionLevel = 3   // Default compression level (from ZSTD_CLEVEL_DEFAULT)
+)
+
+// Buffer pool helpers (simplified versions)
+func GetBuffer(size int) []byte {
+	return make([]byte, 0, size)
+}
+
+func PutBuffer(buf []byte) {
+	// No-op for now - could implement pooling later
+}
+
+func OptimizeBuffer(buf []byte, targetSize int) []byte {
+	if cap(buf) > targetSize*2 {
+		return make([]byte, len(buf), targetSize)
+	}
+	return buf
+}
+
+func GetDecompressBuffer(size int) []byte {
+	return make([]byte, 0, size)
+}
+
+func PutDecompressBuffer(buf []byte) {
+	// No-op for now
+}
 
 // Compress appends compressed src to dst and returns the result.
 func Compress(dst, src []byte) []byte {
@@ -386,7 +414,7 @@ func compress(cctx, cctxDict *cctxWrapper, dst, src []byte, cd *CDict, compressi
 	dst = dst[:dstLen+compressedSize]
 
 	// Optimize buffer to reduce memory waste
-	dst = OptimizeBuffer(dst)
+	dst = OptimizeBuffer(dst, len(dst))
 
 	return dst
 }
@@ -445,14 +473,14 @@ func compress2(cctx *cctxWrapper, dst, src []byte) ([]byte, error) {
 	if int(result) >= 0 {
 		finalDst := dst[:dstLen+compressedSize]
 		// Optimize buffer to reduce memory waste
-		finalDst = OptimizeBuffer(finalDst)
+		finalDst = OptimizeBuffer(finalDst, len(finalDst))
 		return finalDst, nil
 	}
 	if C.ZSTD_getErrorCode(result) != 0 {
 		return dst, mapZstdError(result, "compression", ctx)
 	}
 	finalDst := dst[:dstLen+compressedSize]
-	finalDst = OptimizeBuffer(finalDst)
+	finalDst = OptimizeBuffer(finalDst, len(finalDst))
 	return finalDst, nil
 }
 
@@ -646,7 +674,7 @@ func decompress(dctx, dctxDict *dctxWrapper, dst, src []byte, dd *DDict) ([]byte
 		dst = dst[:dstLen+decompressedSize]
 
 		// Optimize buffer to reduce memory waste
-		dst = OptimizeBuffer(dst)
+		dst = OptimizeBuffer(dst, len(dst))
 
 		return dst, nil
 	}

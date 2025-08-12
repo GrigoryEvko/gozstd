@@ -619,7 +619,7 @@ func (cctx *CCtx) CompressSequences(dst []byte, sequences []ZSTD_Sequence, src [
 	finalDst := dst[:dstLen+compressedSize]
 
 	// Optimize buffer to reduce memory waste
-	finalDst = OptimizeBuffer(finalDst)
+	finalDst = OptimizeBuffer(finalDst, len(finalDst))
 
 	return finalDst, nil
 }

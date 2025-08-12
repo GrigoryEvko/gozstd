@@ -10,6 +10,9 @@ import "C"
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"runtime"
 )
 
 // ZstdError represents a ZSTD-specific error with comprehensive information
@@ -286,4 +289,247 @@ func errStr(result C.size_t) string {
 	errCode := C.ZSTD_getErrorCode(result)
 	errCStr := C.ZSTD_getErrorString(errCode)
 	return C.GoString(errCStr)
+}
+
+// ===== Better Errors (merged from better_errors.go) =====
+
+// CompressionError provides detailed error information
+type CompressionError struct {
+	Operation   string
+	InputSize   int
+	OutputSize  int
+	Level       int
+	Err         error
+	Suggestion  string
+}
+
+func (e *CompressionError) Error() string {
+	msg := fmt.Sprintf("compression failed during %s", e.Operation)
+	
+	if e.InputSize > 0 {
+		msg += fmt.Sprintf(" (input: %d bytes)", e.InputSize)
+	}
+	
+	if e.Err != nil {
+		msg += fmt.Sprintf(": %v", e.Err)
+	}
+	
+	if e.Suggestion != "" {
+		msg += fmt.Sprintf(". Suggestion: %s", e.Suggestion)
+	}
+	
+	return msg
+}
+
+func (e *CompressionError) Unwrap() error {
+	return e.Err
+}
+
+// DecompressionError provides detailed error information
+type DecompressionError struct {
+	Operation      string
+	CompressedSize int
+	ExpectedSize   int
+	Err            error
+	Suggestion     string
+}
+
+func (e *DecompressionError) Error() string {
+	msg := fmt.Sprintf("decompression failed during %s", e.Operation)
+	
+	if e.CompressedSize > 0 {
+		msg += fmt.Sprintf(" (compressed: %d bytes", e.CompressedSize)
+		if e.ExpectedSize > 0 {
+			msg += fmt.Sprintf(", expected output: %d bytes", e.ExpectedSize)
+		}
+		msg += ")"
+	}
+	
+	if e.Err != nil {
+		msg += fmt.Sprintf(": %v", e.Err)
+	}
+	
+	if e.Suggestion != "" {
+		msg += fmt.Sprintf(". Suggestion: %s", e.Suggestion)
+	}
+	
+	return msg
+}
+
+func (e *DecompressionError) Unwrap() error {
+	return e.Err
+}
+
+// ResourceError indicates a resource management problem
+type ResourceError struct {
+	Resource   string
+	Operation  string
+	Err        error
+}
+
+func (e *ResourceError) Error() string {
+	return fmt.Sprintf("resource error with %s during %s: %v", e.Resource, e.Operation, e.Err)
+}
+
+func (e *ResourceError) Unwrap() error {
+	return e.Err
+}
+
+// WrapCompressionError wraps an error with compression context
+func WrapCompressionError(err error, operation string, inputSize int) error {
+	if err == nil {
+		return nil
+	}
+	
+	cerr := &CompressionError{
+		Operation: operation,
+		InputSize: inputSize,
+		Err:      err,
+	}
+	
+	// Add helpful suggestions based on error type
+	switch {
+	case inputSize > 1<<30: // >1GB
+		cerr.Suggestion = "Consider using streaming compression for large data"
+	case inputSize == 0:
+		cerr.Suggestion = "Check if input data is empty"
+	}
+	
+	return cerr
+}
+
+// WrapDecompressionError wraps an error with decompression context
+func WrapDecompressionError(err error, operation string, compressedSize int) error {
+	if err == nil {
+		return nil
+	}
+	
+	derr := &DecompressionError{
+		Operation:      operation,
+		CompressedSize: compressedSize,
+		Err:           err,
+	}
+	
+	// Add helpful suggestions
+	if compressedSize < 4 {
+		derr.Suggestion = "Input too small to be valid compressed data"
+	}
+	
+	return derr
+}
+
+// GetCallerInfo returns information about the calling function for debugging
+func GetCallerInfo() string {
+	pc, file, line, ok := runtime.Caller(2)
+	if !ok {
+		return "unknown"
+	}
+	
+	fn := runtime.FuncForPC(pc)
+	if fn == nil {
+		return fmt.Sprintf("%s:%d", file, line)
+	}
+	
+	return fmt.Sprintf("%s (%s:%d)", fn.Name(), file, line)
+}
+
+// ImproveErrorMessage takes a generic error and adds context
+func ImproveErrorMessage(err error, context string) error {
+	if err == nil {
+		return nil
+	}
+	
+	// Check if it's already one of our detailed errors
+	switch err.(type) {
+	case *CompressionError, *DecompressionError, *ResourceError, *MemoryError:
+		return err
+	}
+	
+	// Wrap with context
+	return fmt.Errorf("%s: %w (called from %s)", context, err, GetCallerInfo())
+}
+
+// ===== Safe Errors (merged from safe_errors.go) =====
+
+// SafeMode controls whether to panic or return errors on critical failures
+var SafeMode = true
+
+// EnablePanicMode reverts to the old behavior of panicking on errors
+// This is for backward compatibility with code that expects panics
+func EnablePanicMode() {
+	SafeMode = false
+}
+
+// checkError is a safer version of ensureNoError that returns an error
+// instead of panicking (unless SafeMode is disabled)
+func checkError(funcName string, result C.size_t) error {
+	if !zstdIsError(result) {
+		return nil
+	}
+	
+	ctx := ErrorContext{}
+	err := mapZstdError(result, funcName, ctx)
+	
+	if !SafeMode {
+		// Old behavior - panic
+		panic(fmt.Errorf("BUG: unexpected error in %s: %w", funcName, err))
+	}
+	
+	// New behavior - return error
+	return fmt.Errorf("%s failed: %w", funcName, err)
+}
+
+// WarnOnDangerousOperation logs a warning for potentially dangerous operations
+func WarnOnDangerousOperation(operation string, details string) {
+	if os.Getenv("GOZSTD_SUPPRESS_WARNINGS") != "" {
+		return
+	}
+	log.Printf("WARNING: %s - %s. Set GOZSTD_SUPPRESS_WARNINGS=1 to disable this warning.", operation, details)
+}
+
+// CheckDecompressionBomb checks if decompression might be a memory bomb
+// and logs a warning (doesn't fail by default)
+func CheckDecompressionBomb(compressedSize, decompressedSize int) {
+	if decompressedSize <= 0 || compressedSize <= 0 {
+		return
+	}
+	
+	ratio := float64(decompressedSize) / float64(compressedSize)
+	if ratio > 1000 {
+		WarnOnDangerousOperation("Potential memory bomb detected",
+			fmt.Sprintf("compression ratio %.0f:1 (decompressed %d bytes from %d bytes)", 
+				ratio, decompressedSize, compressedSize))
+	}
+	
+	// Also warn on very large decompression
+	if decompressedSize > 1<<30 { // 1GB
+		WarnOnDangerousOperation("Large decompression",
+			fmt.Sprintf("decompressing to %d MB", decompressedSize/(1<<20)))
+	}
+}
+
+// HandleWriterError converts writer panics to errors if SafeMode is enabled
+func HandleWriterError(n, expected int) error {
+	err := fmt.Errorf("writer violated io.Writer contract: wrote %d bytes, expected %d bytes", n, expected)
+	
+	if !SafeMode {
+		// Old behavior - panic
+		panic(fmt.Errorf("BUG: %w", err))
+	}
+	
+	// New behavior - return error
+	return err
+}
+
+// HandleDictRefCountError handles dictionary reference count errors safely
+func HandleDictRefCountError(dictType string) error {
+	err := fmt.Errorf("%s reference count went negative", dictType)
+	
+	if !SafeMode {
+		// Old behavior - panic
+		panic(fmt.Errorf("BUG: %w", err))
+	}
+	
+	// New behavior - return error and recover gracefully
+	return err
 }
